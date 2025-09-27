@@ -1,14 +1,16 @@
 # NYC Transit Flood Monitor 🚇🌊
 
-A real-time flood risk assessment system for NYC subway entrances that combines MTA data, stormwater flood maps, and crowdsourced rider reports to identify flooding hotspots and suggest mitigation strategies.
+A comprehensive predictive flood risk assessment system for NYC subway stations that combines real-time weather data, FEMA flood zones, stormwater modeling, and crowdsourced reports to predict flooding and suggest proactive mitigation strategies.
 
 ## 🎯 What it does
 
-### Demo-ready features:
-- **Risk Map**: Interactive visualization of subway entrances ranked by stormwater/flood exposure
-- **Live Status**: Overlays MTA alerts + rider reports to spotlight active flooding issues
-- **Action Panel**: Suggests nearby, feasible mitigations (modular barriers, rain gardens, permeable pavers) for each hotspot
-- **Crowdsourced Reporting**: Allows riders to report flooding conditions in real-time
+### Core Features:
+- **Predictive Risk Assessment**: Machine learning model that calculates flood probability for each station
+- **Interactive Risk Map**: Color-coded subway stations by flood risk (green=safe, red=critical)
+- **Time-based Forecasting**: Slider to see risk predictions for T+1h, T+6h, T+12h, T+24h
+- **Station Detail Panels**: Comprehensive risk analysis with mitigation suggestions
+- **Crowdsourced Reporting**: Real-time flood reports from riders
+- **Mitigation Planning**: Cost-effective solutions with implementation timelines
 
 ## 🗂️ Data Sources
 
@@ -60,14 +62,37 @@ A real-time flood risk assessment system for NYC subway entrances that combines 
 4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
+## 🧠 Predictive Modeling Approach
+
+### Features (Inputs):
+- **Rainfall Intensity**: Real-time and forecasted precipitation (inches/hour)
+- **Station Elevation**: Height above sea level for each entrance
+- **Distance to Water**: Proximity to nearest water body or storm drain
+- **Land Cover**: Impervious surface ratio in surrounding area
+- **FEMA Flood Zone**: Official flood risk classification
+- **Drainage Capacity**: Local stormwater infrastructure capacity
+- **Historical Floods**: Past flooding events at each station
+
+### Target (Outputs):
+- **Flood Probability**: 0-100% likelihood of flooding
+- **Severity Score**: 0-10 scale for flood impact
+- **Time to Flood**: Estimated minutes until flooding begins
+
+### Model Architecture:
+- **Weighted Risk Calculation**: Combines multiple factors with learned weights
+- **Real-time Updates**: Adjusts predictions based on current weather
+- **Historical Learning**: Incorporates past flood events for accuracy
+- **Geospatial Analysis**: Uses Turf.js for distance and intersection calculations
+
 ## 🏗️ Tech Stack
 
 - **Frontend**: Next.js 15, React 19, TypeScript
-- **Mapping**: Mapbox GL JS
-- **Styling**: Tailwind CSS
+- **Mapping**: Mapbox GL JS with custom risk visualization
+- **Styling**: Tailwind CSS with responsive design
 - **Data Processing**: Turf.js for geospatial calculations
 - **Icons**: Lucide React
 - **Date Handling**: date-fns
+- **Predictive Modeling**: Custom risk assessment algorithms
 
 ## 🗺️ Features Overview
 
