@@ -44,6 +44,89 @@ export default function Home() {
   const map = useRef<mapboxgl.Map | null>(null);
   const [subwayEntrances, setSubwayEntrances] = useState<SubwayEntrance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(false);
+  const [showStormwaterFlood, setShowStormwaterFlood] = useState(false);
+  const [floodDataLoading, setFloodDataLoading] = useState(false);
+
+  // Fetch FEMA flood zone data
+  const fetchFEMAFloodZones = async () => {
+    try {
+      // Using a sample FEMA flood zone GeoJSON for NYC
+      // In production, you would use the actual FEMA API or pre-processed data
+      const response = await fetch('/api/fema-flood-zones');
+      if (!response.ok) {
+        // Fallback to sample data if API not available
+        return {
+          type: 'FeatureCollection',
+          features: [
+            // Sample flood zone for demonstration
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [[
+                  [-74.1, 40.6],
+                  [-73.7, 40.6],
+                  [-73.7, 40.9],
+                  [-74.1, 40.9],
+                  [-74.1, 40.6]
+                ]]
+              },
+              properties: {
+                FLOOD_ZONE: 'AE',
+                FLOODWAY: 'FLOODWAY',
+                RISK_ZONE: 'HIGH'
+              }
+            }
+          ]
+        };
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching FEMA flood zones:', error);
+      return { type: 'FeatureCollection', features: [] };
+    }
+  };
+
+  // Fetch NYC DEP stormwater flood data
+  const fetchStormwaterFlood = async () => {
+    try {
+      // Using NYC Open Data API for stormwater flood maps
+      // This is a placeholder - you would use the actual NYC Open Data endpoint
+      const response = await fetch('/api/nyc-stormwater-flood');
+      if (!response.ok) {
+        // Fallback to sample stormwater flood data
+        return {
+          type: 'FeatureCollection',
+          features: [
+            // Sample stormwater flood area for demonstration
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [[
+                  [-73.95, 40.75],
+                  [-73.85, 40.75],
+                  [-73.85, 40.85],
+                  [-73.95, 40.85],
+                  [-73.95, 40.75]
+                ]]
+              },
+              properties: {
+                flood_depth: 2.5,
+                flood_scenario: '10-year storm',
+                area: 'Manhattan'
+              }
+            }
+          ]
+        };
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching NYC stormwater flood data:', error);
+      return { type: 'FeatureCollection', features: [] };
+    }
+  };
 
   // Fetch MTA GTFS subway entrance data
   const fetchSubwayEntrances = async () => {
@@ -268,6 +351,128 @@ export default function Home() {
     };
   }, []);
 
+  // Toggle FEMA flood zones
+  const toggleFEMAFloodZones = async () => {
+    if (!map.current) return;
+    
+    setFloodDataLoading(true);
+    try {
+      if (!showFEMAFloodZones) {
+        const femaData = await fetchFEMAFloodZones();
+        
+        if (femaData.features.length > 0) {
+          map.current.addSource('fema-flood-zones', {
+            type: 'geojson',
+            data: femaData
+          });
+
+          map.current.addLayer({
+            id: 'fema-flood-zones-layer',
+            type: 'fill',
+            source: 'fema-flood-zones',
+            paint: {
+              'fill-color': [
+                'case',
+                ['==', ['get', 'FLOOD_ZONE'], 'AE'], '#dc2626', // Red for high risk
+                ['==', ['get', 'FLOOD_ZONE'], 'A'], '#ea580c',  // Orange for medium risk
+                '#fbbf24' // Yellow for low risk
+              ],
+              'fill-opacity': 0.4
+            }
+          });
+
+          // Add flood zone borders
+          map.current.addLayer({
+            id: 'fema-flood-zones-border',
+            type: 'line',
+            source: 'fema-flood-zones',
+            paint: {
+              'line-color': '#991b1b',
+              'line-width': 2,
+              'line-opacity': 0.8
+            }
+          });
+        }
+      } else {
+        if (map.current.getLayer('fema-flood-zones-layer')) {
+          map.current.removeLayer('fema-flood-zones-layer');
+        }
+        if (map.current.getLayer('fema-flood-zones-border')) {
+          map.current.removeLayer('fema-flood-zones-border');
+        }
+        if (map.current.getSource('fema-flood-zones')) {
+          map.current.removeSource('fema-flood-zones');
+        }
+      }
+      setShowFEMAFloodZones(!showFEMAFloodZones);
+    } catch (error) {
+      console.error('Error toggling FEMA flood zones:', error);
+    } finally {
+      setFloodDataLoading(false);
+    }
+  };
+
+  // Toggle NYC stormwater flood zones
+  const toggleStormwaterFlood = async () => {
+    if (!map.current) return;
+    
+    setFloodDataLoading(true);
+    try {
+      if (!showStormwaterFlood) {
+        const stormwaterData = await fetchStormwaterFlood();
+        
+        if (stormwaterData.features.length > 0) {
+          map.current.addSource('stormwater-flood-zones', {
+            type: 'geojson',
+            data: stormwaterData
+          });
+
+          map.current.addLayer({
+            id: 'stormwater-flood-zones-layer',
+            type: 'fill',
+            source: 'stormwater-flood-zones',
+            paint: {
+              'fill-color': [
+                'case',
+                ['>', ['get', 'flood_depth'], 3], '#7c2d12', // Dark red for deep flooding
+                ['>', ['get', 'flood_depth'], 1.5], '#dc2626', // Red for medium flooding
+                '#f97316' // Orange for shallow flooding
+              ],
+              'fill-opacity': 0.3
+            }
+          });
+
+          // Add stormwater flood zone borders
+          map.current.addLayer({
+            id: 'stormwater-flood-zones-border',
+            type: 'line',
+            source: 'stormwater-flood-zones',
+            paint: {
+              'line-color': '#ea580c',
+              'line-width': 2,
+              'line-opacity': 0.8
+            }
+          });
+        }
+      } else {
+        if (map.current.getLayer('stormwater-flood-zones-layer')) {
+          map.current.removeLayer('stormwater-flood-zones-layer');
+        }
+        if (map.current.getLayer('stormwater-flood-zones-border')) {
+          map.current.removeLayer('stormwater-flood-zones-border');
+        }
+        if (map.current.getSource('stormwater-flood-zones')) {
+          map.current.removeSource('stormwater-flood-zones');
+        }
+      }
+      setShowStormwaterFlood(!showStormwaterFlood);
+    } catch (error) {
+      console.error('Error toggling stormwater flood zones:', error);
+    } finally {
+      setFloodDataLoading(false);
+    }
+  };
+
   return (
     <div className="h-screen w-full relative">
       <div ref={mapContainer} className="h-full w-full" />
@@ -302,6 +507,71 @@ export default function Home() {
           <p className="text-xs text-gray-500 mt-2">Click on markers for station details</p>
         </div>
       )}
+      
+      {/* Layer Control Panel */}
+      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg">
+        <h3 className="font-bold text-sm mb-3">Flood Risk Layers</h3>
+        <div className="space-y-2">
+          <button
+            onClick={toggleFEMAFloodZones}
+            disabled={floodDataLoading}
+            className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors ${
+              showFEMAFloodZones 
+                ? 'bg-red-100 text-red-800 border border-red-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            } ${floodDataLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <div className="flex items-center justify-between">
+              <span>FEMA Flood Zones</span>
+              <span className={`inline-block w-3 h-3 rounded-full ${
+                showFEMAFloodZones ? 'bg-red-500' : 'bg-gray-300'
+              }`}></span>
+            </div>
+          </button>
+          
+          <button
+            onClick={toggleStormwaterFlood}
+            disabled={floodDataLoading}
+            className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors ${
+              showStormwaterFlood 
+                ? 'bg-orange-100 text-orange-800 border border-orange-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            } ${floodDataLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <div className="flex items-center justify-between">
+              <span>Stormwater Flood</span>
+              <span className={`inline-block w-3 h-3 rounded-full ${
+                showStormwaterFlood ? 'bg-orange-500' : 'bg-gray-300'
+              }`}></span>
+            </div>
+          </button>
+        </div>
+        
+        {/* Legend */}
+        <div className="mt-4 pt-3 border-t border-gray-200">
+          <p className="text-xs font-medium text-gray-600 mb-2">Legend:</p>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center">
+              <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+              <span>High Risk (FEMA AE)</span>
+            </div>
+            <div className="flex items-center">
+              <span className="inline-block w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
+              <span>Medium Risk (FEMA A)</span>
+            </div>
+            <div className="flex items-center">
+              <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
+              <span>Low Risk</span>
+            </div>
+          </div>
+        </div>
+        
+        {floodDataLoading && (
+          <div className="mt-2 text-xs text-blue-600">
+            Loading flood data...
+          </div>
+        )}
+      </div>
     </div>
   );
 }
