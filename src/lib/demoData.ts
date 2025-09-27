@@ -309,7 +309,7 @@ export const DEMO_FLOOD_ASSESSMENTS: FloodRiskAssessment[] = [
   {
     stationId: '42nd St - Grand Central-4-5-6-7-S',
     stationName: '42nd St - Grand Central',
-    floodProbability: 75,
+    floodProbability: 72,
     riskLevel: 'high',
     severityScore: 7.2,
     timeToFlood: 45,
@@ -347,10 +347,10 @@ export const DEMO_FLOOD_ASSESSMENTS: FloodRiskAssessment[] = [
     mitigationSuggestions: [
       {
         id: 'flood-barriers-gct',
-        name: 'Enhanced Flood Barriers',
-        description: 'Install permanent flood barriers at all entrances',
-        cost: 2500000,
-        implementationTime: 180,
+        name: 'Modular Flood Barrier',
+        description: 'Deploy modular flood barrier at 42nd and Lexington',
+        cost: 25000,
+        implementationTime: 1,
         effectiveness: 85,
         type: 'barrier'
       },
@@ -481,7 +481,7 @@ export const DEMO_FLOOD_ALERTS: FloodAlert[] = [
     issued_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
     title: 'FLOOD WARNING: Grand Central Terminal',
-    description: '75% chance of platform flooding in next 3 hours due to heavy rainfall forecast. Water accumulation expected in lower concourse areas.',
+    description: '72% chance of platform flooding in next 3 hours due to heavy rainfall forecast. Water accumulation expected in lower concourse areas.',
     source: 'system',
     actions_recommended: [
       'Use alternative routes if possible',

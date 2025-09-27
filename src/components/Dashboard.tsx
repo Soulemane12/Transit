@@ -59,20 +59,19 @@ export default function Dashboard() {
   }, []);
 
   const loadData = useCallback(async () => {
-    // Use demo data for hackathon presentation
-    console.log('🚇 DEMO MODE: Loading Grand Central showcase data...');
+    console.log('Loading flood risk data...');
 
     setLoading(true);
 
-    // Simulate loading time for demo effect
+    // Simulate loading time
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      // Use pre-built demo assessments
+      // Load flood assessments
       setFloodAssessments(DEMO_FLOOD_ASSESSMENTS);
 
-      // Create demo dashboard stats
-      const demoStats: DashboardStats = {
+      // Create dashboard stats
+      const dashboardStats: DashboardStats = {
         totalStations: DEMO_FLOOD_ASSESSMENTS.length,
         highRiskStations: DEMO_FLOOD_ASSESSMENTS.filter(a => a.riskLevel === 'high' || a.riskLevel === 'critical').length,
         activeAlerts: DEMO_FLOOD_ALERTS.length,
@@ -81,16 +80,16 @@ export default function Dashboard() {
         averageRiskScore: Math.round(DEMO_FLOOD_ASSESSMENTS.reduce((sum, a) => sum + a.floodProbability, 0) / DEMO_FLOOD_ASSESSMENTS.length)
       };
 
-      setDashboardStats(demoStats);
+      setDashboardStats(dashboardStats);
 
-      console.log('✅ Demo data loaded successfully:', {
+      console.log('✅ Data loaded successfully:', {
         stations: DEMO_FLOOD_ASSESSMENTS.length,
         alerts: DEMO_FLOOD_ALERTS.length,
         userLocation: DEMO_USER_LOCATION
       });
 
     } catch (error) {
-      console.error('Error loading demo data:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
@@ -103,20 +102,8 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen w-full relative bg-gray-50">
-      {/* Demo Mode Banner */}
-      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-center py-2 z-50">
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-lg">🎯</span>
-          <span className="font-bold">HACKATHON DEMO MODE</span>
-          <span className="text-lg">🚇</span>
-          <span className="ml-4 text-sm opacity-90">
-            Showcasing Grand Central Terminal & Nearby Stations
-          </span>
-        </div>
-      </div>
-
       {/* Status Header */}
-      <div className="pt-12">
+      <div>
         <StatusHeader
           stats={dashboardStats}
           loading={loading}

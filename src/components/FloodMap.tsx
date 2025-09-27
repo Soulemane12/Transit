@@ -101,27 +101,27 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       .filter(route => route && route.trim() !== '')
       .join(' • ');
 
+    // Get the primary mitigation suggestion
+    const primarySuggestion = assessment.mitigationSuggestions?.[0];
+    const rainfallRate = assessment.contributingFactors.rainfallIntensity || 2.0;
+
     return `
-      <div style="min-width: 280px; font-family: system-ui, -apple-system, sans-serif;">
+      <div style="min-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
         <div style="border-bottom: 2px solid ${riskColor}; padding-bottom: 8px; margin-bottom: 12px;">
           <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600;">${assessment.stationName}</h3>
           <div style="font-size: 12px; color: #666; margin-bottom: 4px;">${routes}</div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: ${riskColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; text-transform: uppercase;">
-              ${assessment.riskLevel} Risk
-            </span>
-            <span style="font-size: 13px; font-weight: 600;">${Math.round(assessment.floodProbability)}% Flood Risk</span>
-          </div>
         </div>
 
-        <div style="margin-bottom: 12px;">
-          <div style="font-size: 13px; font-weight: 500; margin-bottom: 6px;">Risk Factors:</div>
-          <div style="font-size: 12px; color: #555; line-height: 1.4;">
-            • Elevation: ${Math.round(assessment.contributingFactors.elevation)}ft above sea level<br>
-            • Distance to water: ${Math.round(assessment.contributingFactors.distanceToWater)}m<br>
-            • FEMA Zone: ${assessment.contributingFactors.femaZone}<br>
-            • Current rainfall: ${assessment.contributingFactors.rainfallIntensity?.toFixed(1) || '0.0'}" per hour
+        <div style="background: #f8fafc; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">
+            <strong>Predicted Risk:</strong> ${Math.round(assessment.floodProbability)}% flooding probability during ${rainfallRate}"/hour rainfall.
           </div>
+
+          ${primarySuggestion ? `
+            <div style="font-size: 14px; font-weight: 600; color: #059669;">
+              <strong>Suggested intervention:</strong> ${primarySuggestion.description}
+            </div>
+          ` : ''}
         </div>
 
         ${assessment.timeToFlood ? `
@@ -131,17 +131,17 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         ` : ''}
 
         <div style="margin-bottom: 12px;">
-          <div style="font-size: 13px; font-weight: 500; margin-bottom: 6px;">Entrances (${stationEntrances.length}):</div>
-          <div style="max-height: 80px; overflow-y: auto; font-size: 11px; color: #666;">
-            ${stationEntrances.slice(0, 3).map(entrance => `
-              <div style="margin-bottom: 2px;">• ${entrance.Entrance_Type} - ${entrance.Corner || 'Station entrance'}</div>
-            `).join('')}
-            ${stationEntrances.length > 3 ? `<div style="font-style: italic;">+${stationEntrances.length - 3} more...</div>` : ''}
+          <div style="font-size: 13px; font-weight: 500; margin-bottom: 6px;">Risk Factors:</div>
+          <div style="font-size: 12px; color: #555; line-height: 1.4;">
+            • Elevation: ${Math.round(assessment.contributingFactors.elevation)}ft above sea level<br>
+            • Distance to water: ${Math.round(assessment.contributingFactors.distanceToWater)}m<br>
+            • FEMA Zone: ${assessment.contributingFactors.femaZone}<br>
+            • Current rainfall: ${rainfallRate}" per hour
           </div>
         </div>
 
         <div style="text-align: center; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-          <div style="font-size: 11px; color: #888;">Click station for detailed info • Click exits for specific entrance data</div>
+          <div style="font-size: 11px; color: #888;">Click exits for specific entrance details</div>
         </div>
       </div>
     `;
