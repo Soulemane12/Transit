@@ -8,17 +8,23 @@ import FloodMap from './FloodMap';
 import type { MapRef } from './FloodMap';
 import EntrancePanel from './EntrancePanel';
 import NearbyStationsPanel from './NearbyStationsPanel';
+import {
+  DEMO_USER_LOCATION,
+  DEMO_SUBWAY_ENTRANCES,
+  DEMO_FLOOD_ASSESSMENTS,
+  DEMO_FLOOD_ALERTS
+} from '../lib/demoData';
 
 
 export default function Dashboard() {
   const [floodAssessments, setFloodAssessments] = useState<FloodRiskAssessment[]>([]);
-  const [entrances, setEntrances] = useState<SubwayEntrance[]>([]);
+  const [entrances, setEntrances] = useState<SubwayEntrance[]>(DEMO_SUBWAY_ENTRANCES);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Set to false for demo
   const [selectedStation, setSelectedStation] = useState<{assessment: FloodRiskAssessment, entrance?: SubwayEntrance} | null>(null);
-  const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(false);
-  const [showStormwaterFlood, setShowStormwaterFlood] = useState(false);
-  const [userLocation, setUserLocation] = useState<{lng: number; lat: number} | null>(null);
+  const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(true); // Show by default for demo
+  const [showStormwaterFlood, setShowStormwaterFlood] = useState(true); // Show by default for demo
+  const [userLocation, setUserLocation] = useState<{lng: number; lat: number} | null>(DEMO_USER_LOCATION);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const mapRef = useRef<MapRef>(null);
@@ -53,34 +59,42 @@ export default function Dashboard() {
   }, []);
 
   const loadData = useCallback(async () => {
+    // Use demo data for hackathon presentation
+    console.log('🚇 DEMO MODE: Loading Grand Central showcase data...');
+
     setLoading(true);
+
+    // Simulate loading time for demo effect
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     try {
-      // Load all data in parallel
-      const [entrances, weatherForecast, femaZones, stormwaterZones] = await Promise.all([
-        dataService.fetchSubwayEntrances(),
-        dataService.fetchWeatherForecast(),
-        dataService.fetchFEMAFloodZones(),
-        dataService.fetchStormwaterFlood()
-      ]);
+      // Use pre-built demo assessments
+      setFloodAssessments(DEMO_FLOOD_ASSESSMENTS);
 
-      // Store entrances
-      setEntrances(entrances);
+      // Create demo dashboard stats
+      const demoStats: DashboardStats = {
+        totalStations: DEMO_FLOOD_ASSESSMENTS.length,
+        highRiskStations: DEMO_FLOOD_ASSESSMENTS.filter(a => a.riskLevel === 'high' || a.riskLevel === 'critical').length,
+        activeAlerts: DEMO_FLOOD_ALERTS.length,
+        lastUpdated: new Date().toISOString(),
+        weatherConditions: 'Heavy Rain Expected',
+        averageRiskScore: Math.round(DEMO_FLOOD_ASSESSMENTS.reduce((sum, a) => sum + a.floodProbability, 0) / DEMO_FLOOD_ASSESSMENTS.length)
+      };
 
-      // Calculate flood risk assessments
-      const assessments: FloodRiskAssessment[] = entrances.map(entrance => 
-        dataService.calculateFloodRisk(entrance, weatherForecast, [...femaZones, ...stormwaterZones])
-      );
+      setDashboardStats(demoStats);
 
-      setFloodAssessments(assessments);
-      setDashboardStats(dataService.getDashboardStats(assessments));
+      console.log('✅ Demo data loaded successfully:', {
+        stations: DEMO_FLOOD_ASSESSMENTS.length,
+        alerts: DEMO_FLOOD_ALERTS.length,
+        userLocation: DEMO_USER_LOCATION
+      });
 
-      // Data loaded successfully
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading demo data:', error);
     } finally {
       setLoading(false);
     }
-  }, [dataService]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -89,12 +103,26 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen w-full relative bg-gray-50">
+      {/* Demo Mode Banner */}
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-center py-2 z-50">
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-lg">🎯</span>
+          <span className="font-bold">HACKATHON DEMO MODE</span>
+          <span className="text-lg">🚇</span>
+          <span className="ml-4 text-sm opacity-90">
+            Showcasing Grand Central Terminal & Nearby Stations
+          </span>
+        </div>
+      </div>
+
       {/* Status Header */}
-      <StatusHeader 
-        stats={dashboardStats} 
-        loading={loading}
-        onRefresh={loadData}
-      />
+      <div className="pt-12">
+        <StatusHeader
+          stats={dashboardStats}
+          loading={loading}
+          onRefresh={loadData}
+        />
+      </div>
 
       {/* Main Map */}
       <div className="relative h-full">
@@ -115,7 +143,11 @@ export default function Dashboard() {
           }}
           showFEMAFloodZones={showFEMAFloodZones}
           showStormwaterFlood={showStormwaterFlood}
-          forecastTime={0} // Default value since we removed the forecast slider
+          forecastTime={0}
+          floodAlerts={DEMO_FLOOD_ALERTS}
+          showFloodAlerts={true}
+          enableUserLocation={true}
+          autoLocateUser={false}
         />
         
         {/* Location error message */}
@@ -159,11 +191,11 @@ export default function Dashboard() {
               });
             }
           }}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 w-80 max-w-sm z-10"
+          className="absolute left-4 top-32 w-80 max-w-sm z-10"
         />
 
         {/* Flood Layer Controls */}
-        <div className="absolute top-20 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
+        <div className="absolute top-32 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
           <h3 className="font-bold text-base mb-4 text-gray-800 flex items-center">
             <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
             Map Layers
