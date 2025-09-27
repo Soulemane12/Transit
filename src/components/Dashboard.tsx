@@ -179,10 +179,28 @@ export default function Dashboard() {
                 });
               }
             }}
-            className="absolute left-4 top-20 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-20 transition-colors"
+            className="absolute left-4 top-16 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg flex items-center justify-center z-20 transition-colors group"
+            title="Find My Location"
           >
-            <span className="text-lg">📍</span>
-            <span className="font-medium text-sm">Find Me</span>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
           </button>
         )}
 
@@ -201,11 +219,11 @@ export default function Dashboard() {
               });
             }
           }}
-          className="absolute left-4 top-36 w-80 max-w-sm z-10"
+          className="absolute left-4 top-28 w-80 max-w-sm z-10"
         />
 
         {/* Flood Layer Controls */}
-        <div className="absolute top-20 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
+        <div className="absolute top-16 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
           <h3 className="font-bold text-base mb-4 text-gray-800 flex items-center">
             <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
             Map Layers
