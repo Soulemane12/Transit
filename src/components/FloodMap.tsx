@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { SubwayEntrance, FloodRiskAssessment } from '../types';
@@ -21,15 +21,20 @@ interface FloodMapProps {
   onUserLocationFound?: (location: { lng: number; lat: number }) => void;
 }
 
-export default function FloodMap({
+export interface MapRef {
+  flyTo: (options: { center: [number, number]; zoom: number; essential?: boolean }) => void;
+  getMap: () => mapboxgl.Map | null;
+}
+
+const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   entrances,
   assessments,
   onStationClick,
+  onUserLocationFound,
   showFEMAFloodZones,
   showStormwaterFlood,
-  forecastTime,
-  onUserLocationFound
-}: FloodMapProps) {
+  forecastTime
+}, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const exitMarkers = useRef<CustomMarker[]>([]);
@@ -499,7 +504,21 @@ export default function FloodMap({
     }
   }, [showStormwaterFlood]);
 
-  return (
-    <div ref={mapContainer} className="h-full w-full" />
-  );
-}
+  // Expose map methods via ref
+  useImperativeHandle(ref, () => ({
+    flyTo: (options) => {
+      if (map.current) {
+        map.current.flyTo({
+          duration: 3000,
+          ...options
+        });
+      }
+    },
+    getMap: () => map.current
+  }), []);
+
+  // Cleanup function
+  return <div ref={mapContainer} className="map-container" />;
+});
+
+export default FloodMap;
