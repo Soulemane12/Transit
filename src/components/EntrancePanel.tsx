@@ -85,27 +85,27 @@ export default function EntrancePanel({ assessment, entrance, onClose }: Entranc
 
 
   return (
-    <div
-      className="absolute top-20 right-4 bottom-4 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 flex flex-col"
-      onMouseDown={(e) => e.stopPropagation()}
-      onMouseMove={(e) => e.stopPropagation()}
-      onWheel={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
-      onTouchMove={(e) => e.stopPropagation()}
-    >
-      {/* Header */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">{assessment.stationName}</h2>
-            <p className="text-sm text-gray-600">Station ID: {assessment.stationId}</p>
+    <div className="w-full h-full overflow-y-auto">
+      {/* Station Header */}
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-gray-900">{assessment.stationName}</h2>
+        {entrance && (
+          <div className="mt-2">
+            <p className="text-sm text-gray-600 flex items-start">
+              <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{entrance.East_West_Street} & {entrance.North_South_Street}</span>
+            </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+        )}
+        
+        {/* Risk Level Badge */}
+        <div className={`mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+          assessment.riskLevel === 'critical' ? 'bg-red-100 text-red-800' :
+          assessment.riskLevel === 'high' ? 'bg-orange-100 text-orange-800' :
+          assessment.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+          'bg-green-100 text-green-800'
+        }`}>
+          {assessment.riskLevel.charAt(0).toUpperCase() + assessment.riskLevel.slice(1)} Risk
         </div>
       </div>
 
@@ -150,7 +150,7 @@ export default function EntrancePanel({ assessment, entrance, onClose }: Entranc
 
         {/* Last Major Disruption */}
         {assessment.historicalFloods.length > 0 && (
-          <div className="mb-6">
+          <div className="px-4 pb-4">
             <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
               <div className="flex items-center space-x-2 mb-2">
                 <AlertTriangle className="w-5 h-5 text-orange-600" />
@@ -163,156 +163,75 @@ export default function EntrancePanel({ assessment, entrance, onClose }: Entranc
           </div>
         )}
 
-        {/* Suggested Intervention */}
-        {assessment.mitigationSuggestions.length > 0 && (
-          <div className="mb-6">
-            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-              <div className="flex items-center space-x-2 mb-2">
-                <Shield className="w-5 h-5 text-green-600" />
-                <span className="text-lg font-semibold text-green-900">Suggested Intervention</span>
-              </div>
-              <p className="text-green-800 text-lg">
-                {assessment.mitigationSuggestions[0].description} at {assessment.stationName} entrance.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Risk Progress Bar */}
-        <div className="mt-4">
-          <div className="flex justify-between text-sm text-gray-600 mb-1">
-            <span>Risk Level</span>
-            <span>{Math.round(assessment.floodProbability)}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
-              className={`h-3 rounded-full transition-all duration-500 ${
-                assessment.riskLevel === 'critical' ? 'bg-red-500' :
-                assessment.riskLevel === 'high' ? 'bg-orange-500' :
-                assessment.riskLevel === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-              }`}
-              style={{ width: `${assessment.floodProbability}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-
       {/* Contributing Factors */}
-      <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Contributing Factors</h3>
-        <div className="space-y-3">
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Elevation</span>
-            <span className="text-sm font-medium">{assessment.contributingFactors.elevation.toFixed(1)} ft</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Distance to Water</span>
-            <span className="text-sm font-medium">{Math.round(assessment.contributingFactors.distanceToWater)}m</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Impervious Surface</span>
-            <span className="text-sm font-medium">{(assessment.contributingFactors.imperviousSurface * 100).toFixed(0)}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">FEMA Zone</span>
-            <span className="text-sm font-medium">{assessment.contributingFactors.femaZone}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Drainage Capacity</span>
-            <span className="text-sm font-medium">{(assessment.contributingFactors.drainageCapacity * 100).toFixed(0)}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Historical Floods */}
-      {assessment.historicalFloods.length > 0 && (
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Historical Floods</h3>
+      <div className="px-4 pb-4">
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Contributing Factors</h3>
           <div className="space-y-3">
-            {assessment.historicalFloods.map((flood, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900">{flood.date}</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    flood.severity === 'major' ? 'bg-red-100 text-red-800' :
-                    flood.severity === 'moderate' ? 'bg-orange-100 text-orange-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {flood.severity}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mb-1">{flood.description}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>Duration: {flood.duration}h</span>
-                  <span>Source: {flood.source}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Mitigation Suggestions */}
-      <div className="p-6 flex-1 overflow-y-auto">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Mitigation Suggestions</h3>
-        <div className="space-y-4">
-          {assessment.mitigationSuggestions.map((suggestion, index) => (
-            <div key={index} className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="font-medium text-gray-900">{suggestion.name}</h4>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  {suggestion.type}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-3">{suggestion.description}</p>
-              
-              <div className="grid grid-cols-3 gap-3 text-xs">
-                <div className="flex items-center space-x-1">
-                  <DollarSign className="w-3 h-3 text-green-600" />
-                  <span className="text-gray-600">{formatCurrency(suggestion.cost)}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Calendar className="w-3 h-3 text-blue-600" />
-                  <span className="text-gray-600">{suggestion.implementationTime}d</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Shield className="w-3 h-3 text-purple-600" />
-                  <span className="text-gray-600">{suggestion.effectiveness}%</span>
-                </div>
-              </div>
-              
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Effectiveness</span>
-                  <span>{suggestion.effectiveness}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-purple-500 h-2 rounded-full"
-                    style={{ width: `${suggestion.effectiveness}%` }}
-                  ></div>
-                </div>
-              </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Elevation</span>
+              <span className="text-sm font-medium">{assessment.contributingFactors.elevation.toFixed(1)} ft</span>
             </div>
-          ))}
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Distance to Water</span>
+              <span className="text-sm font-medium">{Math.round(assessment.contributingFactors.distanceToWater)}m</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Impervious Surface</span>
+              <span className="text-sm font-medium">{(assessment.contributingFactors.imperviousSurface * 100).toFixed(0)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">FEMA Zone</span>
+              <span className="text-sm font-medium">{assessment.contributingFactors.femaZone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Drainage Capacity</span>
+              <span className="text-sm font-medium">{(assessment.contributingFactors.drainageCapacity * 100).toFixed(0)}%</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
-            <MapPin className="w-3 h-3" />
-            <span>Click on map to view other stations</span>
-          </div>
-          <button
-            onClick={() => setShowReportModal(true)}
-            className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>Report Flooding</span>
-          </button>
+      {/* Mitigation Actions */}
+      <div className="px-4 pb-4">
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Recommended Actions</h3>
+          <ul className="space-y-3">
+            {assessment.mitigationSuggestions?.slice(0, 3).map((suggestion, index) => (
+              <li key={index} className="flex items-start">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Shield className="w-3 h-3 text-blue-600" />
+                  </div>
+                </div>
+                <span className="ml-3 text-sm text-gray-700">{suggestion.description}</span>
+              </li>
+            ))}
+            {entrance && (
+              <li className="flex items-start">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Shield className="w-3 h-3 text-blue-600" />
+                  </div>
+                </div>
+                <span className="ml-3 text-sm text-gray-700">
+                  {getExitMitigationSuggestion(entrance)}
+                </span>
+              </li>
+            )}
+          </ul>
         </div>
+      </div>
+
+      {/* Report Button */}
+      <div className="px-4 pb-4">
+        <button
+          onClick={() => setShowReportModal(true)}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-colors shadow-md"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Report Flooding</span>
+        </button>
       </div>
 
       {/* Report Modal */}
@@ -325,5 +244,6 @@ export default function EntrancePanel({ assessment, entrance, onClose }: Entranc
         />
       )}
     </div>
+    </div>
   );
-}
+};

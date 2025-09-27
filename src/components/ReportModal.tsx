@@ -160,8 +160,8 @@ export default function ReportModal({ stationId, stationName, onClose, onSubmit 
             <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
               <MapPin className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-600">
-                {location.latitude !== 0 ? 
-                  `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` :
+                {location.lat !== 0 ? 
+                  `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` :
                   'Getting location...'
                 }
               </span>
