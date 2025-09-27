@@ -108,5 +108,5 @@ export const NYC_BOUNDS = {
   WEST: -74.2591,
 } as const;
 
-export const DEFAULT_MAP_CENTER = [-73.9851, 40.7589] as const;
+export const DEFAULT_MAP_CENTER: [number, number] = [-73.9851, 40.7589];
 export const DEFAULT_ZOOM = 11 as const;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { SubwayEntrance, FloodRiskAssessment } from '../types';
@@ -65,7 +65,7 @@ export default function FloodMap({
     }
   }, [showStormwaterFlood]);
 
-  const addStationsToMap = () => {
+  const addStationsToMap = useCallback(() => {
     if (!map.current) return;
 
     // Remove existing layers and sources
@@ -182,14 +182,14 @@ export default function FloodMap({
         map.current.getCanvas().style.cursor = '';
       }
     });
-  };
+  }, [entrances, assessments, onStationClick]);
 
-  const toggleFEMAFloodZones = async () => {
+  const toggleFEMAFloodZones = useCallback(async () => {
     if (!map.current) return;
 
     if (showFEMAFloodZones) {
       // Add FEMA flood zones (mock data for demo)
-      const femaData = {
+      const femaData: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
         features: [
           {
@@ -233,14 +233,14 @@ export default function FloodMap({
         map.current.removeSource('fema-flood-zones');
       }
     }
-  };
+  }, [showFEMAFloodZones]);
 
-  const toggleStormwaterFlood = async () => {
+  const toggleStormwaterFlood = useCallback(async () => {
     if (!map.current) return;
 
     if (showStormwaterFlood) {
       // Add stormwater flood zones (mock data for demo)
-      const stormwaterData = {
+      const stormwaterData: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
         features: [
           {
@@ -284,7 +284,7 @@ export default function FloodMap({
         map.current.removeSource('stormwater-flood-zones');
       }
     }
-  };
+  }, [showStormwaterFlood]);
 
   return (
     <div ref={mapContainer} className="h-full w-full" />

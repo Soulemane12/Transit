@@ -6,8 +6,9 @@ import {
   WeatherForecast, 
   FloodZone, 
   CrowdsourcedReport,
-  PredictionModel,
-  DashboardStats 
+  DashboardStats,
+  HistoricalFlood,
+  MitigationOption
 } from '../types';
 import { API_ENDPOINTS, RISK_THRESHOLDS, FLOOD_ZONE_RISK_WEIGHTS, MITIGATION_OPTIONS } from './constants';
 
@@ -83,10 +84,10 @@ export class DataService {
 
       const data = response.data;
       if (data.features && data.features.length > 0) {
-        const floodZones: FloodZone[] = data.features.map((feature: any) => ({
+        const floodZones: FloodZone[] = data.features.map((feature: { properties: { FLD_ZONE?: string; STATIC_BFE?: string }; geometry: GeoJSON.Geometry }) => ({
           type: 'FEMA',
           zone: feature.properties.FLD_ZONE || 'Unknown',
-          riskLevel: this.getRiskLevelFromFEMAZone(feature.properties.FLD_ZONE),
+          riskLevel: this.getRiskLevelFromFEMAZone(feature.properties.FLD_ZONE || 'Unknown'),
           baseFloodElevation: feature.properties.STATIC_BFE ? parseFloat(feature.properties.STATIC_BFE) : undefined,
           geometry: feature.geometry
         }));
@@ -108,10 +109,10 @@ export class DataService {
       const data = response.data;
       
       if (data.features && data.features.length > 0) {
-        const stormwaterZones: FloodZone[] = data.features.map((feature: any) => ({
+        const stormwaterZones: FloodZone[] = data.features.map((feature: { properties: { scenario?: string; depth_ft?: number }; geometry: GeoJSON.Geometry }) => ({
           type: 'Stormwater',
           zone: feature.properties.scenario || 'Stormwater',
-          riskLevel: this.getRiskLevelFromDepth(feature.properties.depth_ft),
+          riskLevel: this.getRiskLevelFromDepth(feature.properties.depth_ft || 0),
           depth: feature.properties.depth_ft,
           geometry: feature.geometry
         }));
@@ -145,7 +146,7 @@ export class DataService {
         }
       });
 
-      const forecasts: WeatherForecast[] = response.data.list.map((item: any) => ({
+      const forecasts: WeatherForecast[] = response.data.list.map((item: { dt_txt: string; rain?: { '1h'?: number }; main: { temp: number; humidity: number }; wind: { speed: number }; weather: Array<{ main: string }> }) => ({
         timestamp: item.dt_txt,
         rainfallIntensity: item.rain?.['1h'] || 0,
         temperature: item.main.temp,
@@ -168,7 +169,6 @@ export class DataService {
     weatherForecast: WeatherForecast[], 
     floodZones: FloodZone[]
   ): FloodRiskAssessment {
-    const stationPoint = turf.point([station.Entrance_Longitude, station.Entrance_Latitude]);
     
     // Calculate contributing factors
     const elevation = this.getStationElevation(station);
@@ -249,7 +249,7 @@ export class DataService {
     return 'low';
   }
 
-  private getStationElevation(station: SubwayEntrance): number {
+  private getStationElevation(_station: SubwayEntrance): number {
     // Mock elevation data - in real implementation, use elevation API
     return Math.random() * 50 + 10; // 10-60 feet above sea level
   }
@@ -269,7 +269,7 @@ export class DataService {
     return minDistance === Infinity ? 1000 : minDistance;
   }
 
-  private getImperviousSurfaceRatio(station: SubwayEntrance): number {
+  private getImperviousSurfaceRatio(_station: SubwayEntrance): number {
     // Mock impervious surface ratio - in real implementation, use land cover data
     return Math.random() * 0.8 + 0.2; // 20-100% impervious
   }
@@ -289,12 +289,12 @@ export class DataService {
     return 'X'; // Default to low risk zone
   }
 
-  private getDrainageCapacity(station: SubwayEntrance): number {
+  private getDrainageCapacity(_station: SubwayEntrance): number {
     // Mock drainage capacity - in real implementation, use infrastructure data
     return Math.random() * 0.8 + 0.2; // 20-100% capacity
   }
 
-  private getHistoricalFloods(station: SubwayEntrance): any[] {
+  private getHistoricalFloods(_station: SubwayEntrance): HistoricalFlood[] {
     // Mock historical flood data
     return [
       {
@@ -316,7 +316,7 @@ export class DataService {
     return Math.max(0, (elevation / rainfallIntensity) * 60); // minutes
   }
 
-  private getMitigationSuggestions(riskLevel: string, femaZone: string, imperviousSurface: number): any[] {
+  private getMitigationSuggestions(riskLevel: string, femaZone: string, imperviousSurface: number): MitigationOption[] {
     const suggestions = [];
     
     if (riskLevel === 'high' || riskLevel === 'critical') {

@@ -1,21 +1,19 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { DataService } from '../lib/dataService';
 import { SubwayEntrance, FloodRiskAssessment, DashboardStats } from '../types';
 import { DEFAULT_MAP_CENTER, DEFAULT_ZOOM, MAP_STYLES } from '../lib/constants';
 import StatusHeader from './StatusHeader';
-import FloodMap from './FloodMap';
 import EntrancePanel from './EntrancePanel';
 import ForecastSlider from './ForecastSlider';
 
 export default function Dashboard() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [subwayEntrances, setSubwayEntrances] = useState<SubwayEntrance[]>([]);
-  const [floodAssessments, setFloodAssessments] = useState<FloodRiskAssessment[]>([]);
+  const [, setFloodAssessments] = useState<FloodRiskAssessment[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedStation, setSelectedStation] = useState<FloodRiskAssessment | null>(null);
@@ -25,29 +23,7 @@ export default function Dashboard() {
 
   const dataService = DataService.getInstance();
 
-  useEffect(() => {
-    initializeMap();
-    loadData();
-  }, []);
-
-  const initializeMap = () => {
-    if (!mapContainer.current || map.current) return;
-
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: MAP_STYLES.STREETS,
-      center: DEFAULT_MAP_CENTER,
-      zoom: DEFAULT_ZOOM
-    });
-
-    map.current.on('load', () => {
-      console.log('Map loaded successfully');
-    });
-  };
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Load all data in parallel
@@ -58,7 +34,7 @@ export default function Dashboard() {
         dataService.fetchStormwaterFlood()
       ]);
 
-      setSubwayEntrances(entrances);
+      // Store entrances for map display
 
       // Calculate flood risk assessments
       const assessments: FloodRiskAssessment[] = entrances.map(entrance => 
@@ -77,7 +53,29 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  }, [dataService]);
+
+  const initializeMap = () => {
+    if (!mapContainer.current || map.current) return;
+
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: MAP_STYLES.STREETS,
+      center: DEFAULT_MAP_CENTER,
+      zoom: DEFAULT_ZOOM
+    });
+
+    map.current.on('load', () => {
+      console.log('Map loaded successfully');
+    });
   };
+
+  useEffect(() => {
+    initializeMap();
+    loadData();
+  }, [loadData]);
 
   const addStationsToMap = (entrances: SubwayEntrance[], assessments: FloodRiskAssessment[]) => {
     if (!map.current) return;
@@ -194,7 +192,7 @@ export default function Dashboard() {
     if (!map.current) return;
     
     if (!showFEMAFloodZones) {
-      const femaZones = await dataService.fetchFEMAFloodZones();
+      await dataService.fetchFEMAFloodZones();
       // Add FEMA zones to map (implementation similar to existing code)
     }
     setShowFEMAFloodZones(!showFEMAFloodZones);
@@ -204,7 +202,7 @@ export default function Dashboard() {
     if (!map.current) return;
     
     if (!showStormwaterFlood) {
-      const stormwaterZones = await dataService.fetchStormwaterFlood();
+      await dataService.fetchStormwaterFlood();
       // Add stormwater zones to map (implementation similar to existing code)
     }
     setShowStormwaterFlood(!showStormwaterFlood);

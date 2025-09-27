@@ -10,14 +10,6 @@ interface StatusHeaderProps {
 }
 
 export default function StatusHeader({ stats, loading, onRefresh }: StatusHeaderProps) {
-  const getRiskColor = (riskLevel: string) => {
-    switch (riskLevel) {
-      case 'critical': return 'text-red-600 bg-red-50';
-      case 'high': return 'text-orange-600 bg-orange-50';
-      case 'medium': return 'text-yellow-600 bg-yellow-50';
-      default: return 'text-green-600 bg-green-50';
-    }
-  };
 
   const getRiskIcon = (riskLevel: string) => {
     switch (riskLevel) {
