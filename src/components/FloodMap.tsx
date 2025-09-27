@@ -54,6 +54,38 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   const [, setHoveredStation] = useState<string | null>(null);
   const [, setActiveAlerts] = useState<FloodAlert[]>([]);
   const [userLocation, setUserLocation] = useState<{ lng: number; lat: number } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const pendingOperations = useRef<Array<() => void>>([]);
+
+  // Queue operations until map is ready
+  const queueMapOperation = useCallback((operation: () => void) => {
+    if (mapReady && map.current && map.current.isStyleLoaded()) {
+      try {
+        operation();
+      } catch (error) {
+        console.error('Error executing map operation:', error);
+      }
+    } else {
+      pendingOperations.current.push(operation);
+    }
+  }, [mapReady]);
+
+  // Execute all pending operations
+  const executePendingOperations = useCallback(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    console.log(`Executing ${pendingOperations.current.length} pending operations`);
+    const operations = [...pendingOperations.current];
+    pendingOperations.current = [];
+
+    operations.forEach((operation, index) => {
+      try {
+        operation();
+      } catch (error) {
+        console.error(`Error executing pending operation ${index}:`, error);
+      }
+    });
+  }, []);
 
   // Create detailed popup content for stations
   const createStationPopupContent = (assessment: FloodRiskAssessment, stationEntrances: SubwayEntrance[]) => {
@@ -120,7 +152,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
     if (!mapContainer.current || map.current) return;
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-    
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: MAP_STYLES.STREETS,
@@ -128,10 +160,33 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       zoom: DEFAULT_ZOOM
     });
 
-    // Add map controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.current.addControl(new mapboxgl.ScaleControl());
-    map.current.addControl(new mapboxgl.FullscreenControl());
+    // Wait for style to be completely loaded before proceeding
+    const onStyleLoad = () => {
+      console.log('Map style fully loaded');
+      setMapReady(true);
+
+      // Execute any pending operations
+      setTimeout(() => {
+        executePendingOperations();
+      }, 100);
+
+      map.current?.off('styledata', onStyleLoad);
+    };
+
+    map.current.on('styledata', () => {
+      if (map.current?.isStyleLoaded()) {
+        onStyleLoad();
+      }
+    });
+
+    // Add map controls after style loads
+    queueMapOperation(() => {
+      if (map.current) {
+        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        map.current.addControl(new mapboxgl.ScaleControl());
+        map.current.addControl(new mapboxgl.FullscreenControl());
+      }
+    });
 
     // Add geolocate control if user location is enabled
     if (enableUserLocation) {
@@ -228,29 +283,31 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         map.current = null;
       }
     };
-  }, [onUserLocationFound, enableUserLocation, autoLocateUser]);
+  }, [onUserLocationFound, enableUserLocation, autoLocateUser, queueMapOperation, executePendingOperations]);
 
   // Add stations to map
   const addStationsToMap = useCallback(() => {
-    if (!map.current || entrances.length === 0 || assessments.length === 0) return;
+    if (entrances.length === 0 || assessments.length === 0) return;
 
-    // Check if map style is loaded before proceeding
-    if (!map.current.isStyleLoaded()) {
-      console.log('Map style not loaded yet, skipping station addition');
-      return;
-    }
+    const stationsOperation = () => {
+      if (!map.current || !map.current.isStyleLoaded()) {
+        console.log('Map not ready for stations, queuing operation');
+        return;
+      }
 
-    try {
-      // Remove existing layers and sources safely
-      if (map.current.getLayer('stations-layer')) {
-        map.current.removeLayer('stations-layer');
+      console.log('Adding stations to map...');
+
+      try {
+        // Remove existing layers and sources safely
+        if (map.current.getLayer('stations-layer')) {
+          map.current.removeLayer('stations-layer');
+        }
+        if (map.current.getSource('stations')) {
+          map.current.removeSource('stations');
+        }
+      } catch (error) {
+        console.warn('Error removing existing layers:', error);
       }
-      if (map.current.getSource('stations')) {
-        map.current.removeSource('stations');
-      }
-    } catch (error) {
-      console.warn('Error removing existing layers:', error);
-    }
 
     // Group entrances by station
     const stationGroups = entrances.reduce<Record<string, { entrances: SubwayEntrance[]; assessment?: FloodRiskAssessment }>>((acc, entrance) => {
@@ -377,128 +434,124 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       return;
     }
 
-    // Add click handler for stations
-    const onStationClickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
-      if (!e.features || e.features.length === 0 || !map.current) return;
+      // Add click handler for stations
+      const onStationClickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        if (!e.features || e.features.length === 0 || !map.current) return;
 
-      const feature = e.features[0];
-      const properties = feature.properties;
+        const feature = e.features[0];
+        const properties = feature.properties;
 
-      if (!properties) return;
+        if (!properties) return;
 
-      const stationAssessment = assessments.find(a => a.stationId === properties.id);
-      if (stationAssessment) {
-        setSelectedStation(stationAssessment);
+        const stationAssessment = assessments.find(a => a.stationId === properties.id);
+        if (stationAssessment) {
+          setSelectedStation(stationAssessment);
 
-        // Find all entrances for this station
-        const stationEntrances = entrances.filter(
-          entrance => `${entrance.Station_Name}-${entrance.Line}` === stationAssessment.stationId
-        );
+          // Find all entrances for this station
+          const stationEntrances = entrances.filter(
+            entrance => `${entrance.Station_Name}-${entrance.Line}` === stationAssessment.stationId
+          );
 
-        // Close existing popup
-        if (currentPopup.current) {
-          currentPopup.current.remove();
+          // Close existing popup
+          if (currentPopup.current) {
+            currentPopup.current.remove();
+          }
+
+          // Create and show detailed popup
+          const popupContent = createStationPopupContent(stationAssessment, stationEntrances);
+          const coordinates: [number, number] = feature.geometry.type === 'Point' ?
+            [feature.geometry.coordinates[0], feature.geometry.coordinates[1]] : [0, 0];
+
+          currentPopup.current = new mapboxgl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            maxWidth: '320px',
+            className: 'station-popup'
+          })
+            .setLngLat(coordinates)
+            .setHTML(popupContent)
+            .addTo(map.current);
+
+          // Fly to station
+          map.current.flyTo({
+            center: coordinates,
+            zoom: Math.max(map.current.getZoom(), 14),
+            duration: 1500
+          });
+
+          onStationClick(stationAssessment);
         }
+      };
 
-        // Create and show detailed popup
-        const popupContent = createStationPopupContent(stationAssessment, stationEntrances);
-        const coordinates: [number, number] = feature.geometry.type === 'Point' ?
-          [feature.geometry.coordinates[0], feature.geometry.coordinates[1]] : [0, 0];
+      // Add event listeners
+      map.current.on('click', 'stations-layer', onStationClickHandler);
 
-        currentPopup.current = new mapboxgl.Popup({
-          closeButton: true,
-          closeOnClick: false,
-          maxWidth: '320px',
-          className: 'station-popup'
-        })
-          .setLngLat(coordinates)
-          .setHTML(popupContent)
-          .addTo(map.current);
+      // Add hover effects and cursor changes
+      const onMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = 'pointer';
 
-        // Fly to station
-        map.current.flyTo({
-          center: coordinates,
-          zoom: Math.max(map.current.getZoom(), 14),
-          duration: 1500
-        });
+          if (e.features && e.features.length > 0) {
+            const properties = e.features[0].properties;
+            if (properties) {
+              setHoveredStation(properties.id);
 
-        onStationClick(stationAssessment);
-      }
-    };
+              // Add visual feedback - increase circle size and add glow
+              map.current.setPaintProperty('stations-layer', 'circle-stroke-width', [
+                'case',
+                ['==', ['get', 'id'], properties.id],
+                4,
+                2
+              ]);
 
-    // Add event listeners
-    map.current.on('click', 'stations-layer', onStationClickHandler);
-    
-    // Add hover effects and cursor changes
-    const onMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
-      if (map.current) {
-        map.current.getCanvas().style.cursor = 'pointer';
-
-        if (e.features && e.features.length > 0) {
-          const properties = e.features[0].properties;
-          if (properties) {
-            setHoveredStation(properties.id);
-
-            // Add visual feedback - increase circle size and add glow
-            map.current.setPaintProperty('stations-layer', 'circle-stroke-width', [
-              'case',
-              ['==', ['get', 'id'], properties.id],
-              4,
-              2
-            ]);
-
-            map.current.setPaintProperty('stations-layer', 'circle-radius', [
-              'case',
-              ['==', ['get', 'id'], properties.id],
-              [
-                'interpolate',
-                ['linear'],
-                ['get', 'floodProbability'],
-                0, 8,
-                100, 16
-              ],
-              [
-                'interpolate',
-                ['linear'],
-                ['get', 'floodProbability'],
-                0, 6,
-                100, 12
-              ]
-            ]);
+              map.current.setPaintProperty('stations-layer', 'circle-radius', [
+                'case',
+                ['==', ['get', 'id'], properties.id],
+                [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'floodProbability'],
+                  0, 8,
+                  100, 16
+                ],
+                [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'floodProbability'],
+                  0, 6,
+                  100, 12
+                ]
+              ]);
+            }
           }
         }
-      }
+      };
+
+      const onMouseLeave = () => {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = '';
+          setHoveredStation(null);
+
+          // Reset visual feedback
+          map.current.setPaintProperty('stations-layer', 'circle-stroke-width', 2);
+          map.current.setPaintProperty('stations-layer', 'circle-radius', [
+            'interpolate',
+            ['linear'],
+            ['get', 'floodProbability'],
+            0, 6,
+            100, 12
+          ]);
+        }
+      };
+
+      map.current.on('mouseenter', 'stations-layer', onMouseEnter);
+      map.current.on('mouseleave', 'stations-layer', onMouseLeave);
+
+      console.log('Stations added successfully');
     };
 
-    const onMouseLeave = () => {
-      if (map.current) {
-        map.current.getCanvas().style.cursor = '';
-        setHoveredStation(null);
-
-        // Reset visual feedback
-        map.current.setPaintProperty('stations-layer', 'circle-stroke-width', 2);
-        map.current.setPaintProperty('stations-layer', 'circle-radius', [
-          'interpolate',
-          ['linear'],
-          ['get', 'floodProbability'],
-          0, 6,
-          100, 12
-        ]);
-      }
-    };
-
-    map.current.on('mouseenter', 'stations-layer', onMouseEnter);
-    map.current.on('mouseleave', 'stations-layer', onMouseLeave);
-
-    // Cleanup function
-    return () => {
-      if (map.current) {
-        map.current.off('click', 'stations-layer', onStationClickHandler);
-        map.current.off('mouseenter', 'stations-layer', onMouseEnter);
-        map.current.off('mouseleave', 'stations-layer', onMouseLeave);
-      }
-    };
-  }, [entrances, assessments, onStationClick]);
+    queueMapOperation(stationsOperation);
+  }, [entrances, assessments, onStationClick, queueMapOperation]);
 
   // Create entrance popup content
   const createEntrancePopupContent = useCallback((entrance: SubwayEntrance, assessment: FloodRiskAssessment) => {
@@ -557,11 +610,14 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
   // Add exit markers for the selected station
   const addExitMarkers = useCallback(() => {
-    if (!map.current || !selectedStation) return;
+    if (!selectedStation) return;
 
-    // Clear existing markers
-    exitMarkers.current.forEach(marker => marker.remove());
-    exitMarkers.current = [];
+    const exitOperation = () => {
+      if (!map.current || !map.current.isStyleLoaded()) return;
+
+      // Clear existing markers
+      exitMarkers.current.forEach(marker => marker.remove());
+      exitMarkers.current = [];
 
     // Find entrances for the selected station
     const stationEntrances = entrances.filter(
@@ -665,16 +721,22 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       });
 
       exitMarkers.current.push(marker as CustomMarker);
-    });
-  }, [selectedStation, entrances, onStationClick, createEntrancePopupContent]);
+      });
+    };
+
+    queueMapOperation(exitOperation);
+  }, [selectedStation, entrances, onStationClick, createEntrancePopupContent, queueMapOperation]);
 
   // Add flood alert markers
   const addFloodAlertMarkers = useCallback(() => {
-    if (!map.current || !showFloodAlerts) return;
+    if (!showFloodAlerts) return;
 
-    // Clear existing alert markers
-    alertMarkers.current.forEach(marker => marker.remove());
-    alertMarkers.current = [];
+    const alertOperation = () => {
+      if (!map.current || !map.current.isStyleLoaded()) return;
+
+      // Clear existing alert markers
+      alertMarkers.current.forEach(marker => marker.remove());
+      alertMarkers.current = [];
 
     floodAlerts.forEach(alert => {
       // Find the station for this alert
@@ -762,8 +824,11 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       });
 
       alertMarkers.current.push(marker as CustomMarker);
-    });
-  }, [floodAlerts, entrances, showFloodAlerts]);
+      });
+    };
+
+    queueMapOperation(alertOperation);
+  }, [floodAlerts, entrances, showFloodAlerts, queueMapOperation]);
 
   // Create alert popup content
   const createAlertPopupContent = (alert: FloodAlert, station: SubwayEntrance) => {
@@ -829,12 +894,13 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
   // Toggle FEMA flood zones layer
   const toggleFEMAFloodZones = useCallback((show: boolean) => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    const floodZoneOperation = () => {
+      if (!map.current || !map.current.isStyleLoaded()) return;
 
-    try {
-      if (show) {
-        // Add FEMA flood zones layer
-        if (!map.current.getSource('fema-flood-zones')) {
+      try {
+        if (show) {
+          // Add FEMA flood zones layer
+          if (!map.current.getSource('fema-flood-zones')) {
           // For demo, create a simple placeholder flood zone
           const demoFloodZone = {
             type: 'FeatureCollection' as const,
@@ -877,19 +943,23 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       } else if (map.current.getLayer('fema-flood-zones-layer')) {
         map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'none');
       }
-    } catch (error) {
-      console.warn('Error toggling FEMA flood zones:', error);
-    }
-  }, []);
+      } catch (error) {
+        console.warn('Error toggling FEMA flood zones:', error);
+      }
+    };
+
+    queueMapOperation(floodZoneOperation);
+  }, [queueMapOperation]);
 
   // Toggle stormwater flood layer
   const toggleStormwaterFlood = useCallback((show: boolean) => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    const stormwaterOperation = () => {
+      if (!map.current || !map.current.isStyleLoaded()) return;
 
-    try {
-      if (show) {
-        // Add stormwater flood layer
-        if (!map.current.getSource('stormwater-flood')) {
+      try {
+        if (show) {
+          // Add stormwater flood layer
+          if (!map.current.getSource('stormwater-flood')) {
           // For demo, create a simple placeholder stormwater flood area
           const demoStormwaterFlood = {
             type: 'FeatureCollection' as const,
@@ -932,130 +1002,29 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       } else if (map.current.getLayer('stormwater-flood-layer')) {
         map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'none');
       }
-    } catch (error) {
-      console.warn('Error toggling stormwater flood layer:', error);
-    }
-  }, []);
+      } catch (error) {
+        console.warn('Error toggling stormwater flood layer:', error);
+      }
+    };
+
+    queueMapOperation(stormwaterOperation);
+  }, [queueMapOperation]);
 
   // Update map when data changes
   useEffect(() => {
-    if (!map.current) return;
-
-    const updateMapData = () => {
-      // Ensure both map and style are fully loaded
-      if (!map.current || !map.current.loaded() || !map.current.isStyleLoaded()) {
-        console.log('Map or style not ready, deferring update');
-        return;
-      }
-
-      // Add delay to ensure style is fully ready
-      setTimeout(() => {
-        try {
-          if (map.current && map.current.isStyleLoaded()) {
-            console.log('Updating map data...');
-            addStationsToMap();
-            if (selectedStation) {
-              addExitMarkers();
-            }
-            addFloodAlertMarkers();
-            console.log('Map data updated successfully');
-          }
-        } catch (error) {
-          console.warn('Error updating map data:', error);
-          // Retry after longer delay with additional checks
-          setTimeout(() => {
-            try {
-              if (map.current && map.current.isStyleLoaded()) {
-                console.log('Retrying map data update...');
-                addStationsToMap();
-                if (selectedStation) {
-                  addExitMarkers();
-                }
-                addFloodAlertMarkers();
-                console.log('Map data updated successfully on retry');
-              } else {
-                console.warn('Map style still not loaded on retry');
-              }
-            } catch (retryError) {
-              console.error('Failed to update map data after retry:', retryError);
-            }
-          }, 3000);
-        }
-      }, 1000);
-    };
-
-    if (map.current.loaded() && map.current.isStyleLoaded()) {
-      updateMapData();
-    } else {
-      let loadCompleted = false;
-      let styleCompleted = false;
-      let updateCalled = false;
-
-      const checkAndUpdate = () => {
-        if (loadCompleted && styleCompleted && !updateCalled) {
-          updateCalled = true;
-          updateMapData();
-        }
-      };
-
-      const onLoad = () => {
-        console.log('Map load event fired');
-        loadCompleted = true;
-        checkAndUpdate();
-        map.current?.off('load', onLoad);
-      };
-
-      const onStyleData = () => {
-        console.log('Map styledata event fired');
-        if (map.current?.isStyleLoaded()) {
-          styleCompleted = true;
-          checkAndUpdate();
-          map.current?.off('styledata', onStyleData);
-        }
-      };
-
-      // Listen for both load and styledata events
-      map.current.on('load', onLoad);
-      map.current.on('styledata', onStyleData);
+    console.log('Data changed, updating map...');
+    addStationsToMap();
+    if (selectedStation) {
+      addExitMarkers();
     }
+    addFloodAlertMarkers();
   }, [entrances, assessments, forecastTime, addStationsToMap, addExitMarkers, selectedStation, addFloodAlertMarkers]);
 
   // Toggle flood layers when visibility changes
   useEffect(() => {
-    if (map.current && map.current.loaded() && map.current.isStyleLoaded()) {
-      setTimeout(() => {
-        try {
-          console.log('Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
-          toggleFEMAFloodZones(showFEMAFloodZones);
-          toggleStormwaterFlood(showStormwaterFlood);
-        } catch (error) {
-          console.warn('Error toggling flood layers:', error);
-          // Retry once
-          setTimeout(() => {
-            try {
-              if (map.current && map.current.isStyleLoaded()) {
-                toggleFEMAFloodZones(showFEMAFloodZones);
-                toggleStormwaterFlood(showStormwaterFlood);
-              }
-            } catch (retryError) {
-              console.error('Failed to toggle flood layers on retry:', retryError);
-            }
-          }, 2000);
-        }
-      }, 1500);
-    } else {
-      // Wait for map to be ready
-      setTimeout(() => {
-        if (map.current && map.current.loaded() && map.current.isStyleLoaded()) {
-          try {
-            toggleFEMAFloodZones(showFEMAFloodZones);
-            toggleStormwaterFlood(showStormwaterFlood);
-          } catch (error) {
-            console.warn('Error toggling flood layers after wait:', error);
-          }
-        }
-      }, 3000);
-    }
+    console.log('Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
+    toggleFEMAFloodZones(showFEMAFloodZones);
+    toggleStormwaterFlood(showStormwaterFlood);
   }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood]);
 
   // Expose map methods via ref
