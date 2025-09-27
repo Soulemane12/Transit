@@ -13,7 +13,7 @@ export default function Dashboard() {
   const [entrances, setEntrances] = useState<SubwayEntrance[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedStation, setSelectedStation] = useState<FloodRiskAssessment | null>(null);
+  const [selectedStation, setSelectedStation] = useState<{assessment: FloodRiskAssessment, entrance?: SubwayEntrance} | null>(null);
   const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(false);
   const [showStormwaterFlood, setShowStormwaterFlood] = useState(false);
   const [forecastTime, setForecastTime] = useState(0); // hours ahead
@@ -74,7 +74,7 @@ export default function Dashboard() {
         <FloodMap
           entrances={entrances}
           assessments={floodAssessments}
-          onStationClick={setSelectedStation}
+          onStationClick={(assessment, entrance) => setSelectedStation({assessment, entrance})}
           showFEMAFloodZones={showFEMAFloodZones}
           showStormwaterFlood={showStormwaterFlood}
           forecastTime={forecastTime}
@@ -154,7 +154,8 @@ export default function Dashboard() {
       {/* Station Detail Panel */}
       {selectedStation && (
         <EntrancePanel 
-          assessment={selectedStation}
+          assessment={selectedStation.assessment}
+          entrance={selectedStation.entrance}
           onClose={() => setSelectedStation(null)}
         />
       )}

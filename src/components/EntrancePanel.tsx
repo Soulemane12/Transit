@@ -1,16 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { FloodRiskAssessment } from '../types';
+import { FloodRiskAssessment, SubwayEntrance } from '../types';
 import { X, AlertTriangle, MapPin, Droplets, Shield, DollarSign, Calendar, MessageSquare } from 'lucide-react';
 import ReportModal from './ReportModal';
 
 interface EntrancePanelProps {
   assessment: FloodRiskAssessment;
+  entrance?: SubwayEntrance;
   onClose: () => void;
 }
 
-export default function EntrancePanel({ assessment, onClose }: EntrancePanelProps) {
+export default function EntrancePanel({ assessment, entrance, onClose }: EntrancePanelProps) {
   const [showReportModal, setShowReportModal] = useState(false);
 
   const handleReportSubmit = async (report: Omit<import('../types').CrowdsourcedReport, 'id' | 'timestamp'>) => {
@@ -18,6 +19,21 @@ export default function EntrancePanel({ assessment, onClose }: EntrancePanelProp
     console.log('Submitting flood report:', report);
     // For now, just show a success message
     alert('Report submitted successfully! Thank you for helping improve flood monitoring.');
+  };
+
+  const getExitMitigationSuggestion = (entrance: SubwayEntrance) => {
+    // Simple logic to generate suggestions based on street names
+    const streetName = entrance.East_West_Street?.toLowerCase() || '';
+    
+    if (streetName.includes('14') || streetName.includes('fourteen')) {
+      return 'Deploy modular flood barrier at entrance.';
+    } else if (streetName.includes('broadway') || streetName.includes('main')) {
+      return 'Install permanent flood gates with automatic sensors.';
+    } else if (streetName.includes('water') || streetName.includes('river')) {
+      return 'Implement elevated walkway and sump pump system.';
+    } else {
+      return 'Deploy temporary sandbag barriers and install flood sensors.';
+    }
   };
   const getRiskColor = (riskLevel: string) => {
     switch (riskLevel) {
@@ -83,9 +99,25 @@ export default function EntrancePanel({ assessment, onClose }: EntrancePanelProp
               <Droplets className="w-5 h-5 text-blue-600" />
               <span className="text-lg font-semibold text-blue-900">Predicted Risk</span>
             </div>
-            <p className="text-blue-800 text-lg">
-              {Math.round(assessment.floodProbability)}% flooding probability during {assessment.contributingFactors.rainfallIntensity?.toFixed(1) || '2.0'}&quot; /hour rainfall.
-            </p>
+            {entrance ? (
+              <>
+                <p className="text-blue-800 text-lg">
+                  {Math.round(assessment.floodProbability * 1.2)}% flooding probability during {assessment.contributingFactors.rainfallIntensity?.toFixed(1) || '2.0'}&quot; /hour rainfall.
+                </p>
+                <div className="mt-3 p-3 bg-blue-100 rounded-lg border border-blue-200">
+                  <p className="text-blue-800 text-sm">
+                    <span className="font-semibold">Exit Location:</span> {entrance.East_West_Street} & {entrance.North_South_Street}
+                  </p>
+                  <p className="text-blue-800 text-sm mt-1">
+                    <span className="font-semibold">Suggested intervention:</span> {getExitMitigationSuggestion(entrance)}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-blue-800 text-lg">
+                {Math.round(assessment.floodProbability)}% flooding probability during {assessment.contributingFactors.rainfallIntensity?.toFixed(1) || '2.0'}&quot; /hour rainfall.
+              </p>
+            )}
           </div>
         </div>
 

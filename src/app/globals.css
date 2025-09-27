@@ -6,3 +6,23 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Exit marker styles */
+.exit-marker {
+  width: 14px;
+  height: 14px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exit-marker:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.8);
+}
+
+.mapboxgl-marker.exit-marker {
+  z-index: 10;
+}

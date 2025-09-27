@@ -9,7 +9,7 @@ import { DEFAULT_MAP_CENTER, DEFAULT_ZOOM, MAP_STYLES } from '../lib/constants';
 interface FloodMapProps {
   entrances: SubwayEntrance[];
   assessments: FloodRiskAssessment[];
-  onStationClick: (assessment: FloodRiskAssessment) => void;
+  onStationClick: (assessment: FloodRiskAssessment, entrance?: SubwayEntrance) => void;
   showFEMAFloodZones: boolean;
   showStormwaterFlood: boolean;
   forecastTime: number;
@@ -50,8 +50,38 @@ export default function FloodMap({
   useEffect(() => {
     if (map.current && entrances.length > 0 && assessments.length > 0) {
       addStationsToMap();
+      addExitMarkers();
     }
   }, [entrances, assessments, forecastTime]);
+  
+  const addExitMarkers = useCallback(() => {
+    if (!map.current) return;
+    
+    // Remove any existing exit markers
+    document.querySelectorAll('.exit-marker').forEach(el => el.remove());
+    
+    // Add exit markers for each exit
+    entrances.forEach(entrance => {
+      if (entrance.Entrance_Type === 'Exit Only') {
+        const el = document.createElement('div');
+        el.className = 'exit-marker';
+        el.title = `Exit at ${entrance.East_West_Street} & ${entrance.North_South_Street}`;
+        
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const stationKey = `${entrance.Station_Name}-${entrance.Line}`;
+          const assessment = assessments.find(a => a.stationId === stationKey);
+          if (assessment) {
+            onStationClick(assessment, entrance);
+          }
+        });
+        
+        new mapboxgl.Marker(el)
+          .setLngLat([entrance.Entrance_Longitude, entrance.Entrance_Latitude])
+          .addTo(map.current!);
+      }
+    });
+  }, [entrances, assessments, onStationClick]);
 
   useEffect(() => {
     if (map.current) {
@@ -163,11 +193,21 @@ export default function FloodMap({
       }
     });
 
-    // Add click interaction
+    // Add click event for stations and exits
     map.current.on('click', 'stations-layer', (e) => {
-      const properties = e.features?.[0]?.properties;
-      if (properties) {
-        onStationClick(properties.assessment);
+      if (!e.features || e.features.length === 0) return;
+      const feature = e.features[0];
+      const stationKey = feature.properties?.stationKey;
+      if (stationKey) {
+        const assessment = assessments.find(a => a.stationId === stationKey);
+        if (assessment) {
+          // Find the specific entrance if it's an exit
+          const entrance = entrances.find(e => 
+            `${e.Station_Name}-${e.Line}` === stationKey &&
+            e.Entrance_Type === 'Exit Only'
+          );
+          onStationClick(assessment, entrance);
+        }
       }
     });
 
