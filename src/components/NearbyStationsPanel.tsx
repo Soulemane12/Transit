@@ -27,9 +27,17 @@ export default function NearbyStationsPanel({
   className = ''
 }: NearbyStationsPanelProps) {
   const [nearbyStations, setNearbyStations] = useState<NearbyStation[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const findNearbyStations = useCallback(() => {
+    console.log('Finding nearby stations...', {
+      userLocation,
+      entrancesCount: entrances.length,
+      assessmentsCount: assessments.length
+    });
+
     if (!userLocation || !entrances.length || !assessments.length) {
+      console.log('Missing data for nearby stations');
       setNearbyStations([]);
       return;
     }
@@ -65,8 +73,8 @@ export default function NearbyStationsPanel({
         }
       });
 
-      // Include stations within 3km
-      if (closestDistance <= 3) {
+      // Include stations within 5km (increased range for better coverage)
+      if (closestDistance <= 5) {
         const walkTime = Math.round(closestDistance * 12); // ~12 minutes per km
         nearbyData.push({
           entrance: closestEntrance,
@@ -82,12 +90,21 @@ export default function NearbyStationsPanel({
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 10);
 
+    console.log('Found nearby stations:', sortedNearby.length, sortedNearby.map(s => ({
+      name: s.assessment.stationName,
+      distance: s.distance.toFixed(2) + 'km'
+    })));
+
     setNearbyStations(sortedNearby);
   }, [userLocation, entrances, assessments]);
 
   useEffect(() => {
-    findNearbyStations();
-  }, [findNearbyStations]);
+    if (userLocation && entrances.length > 0 && assessments.length > 0) {
+      setIsSearching(true);
+      findNearbyStations();
+      setIsSearching(false);
+    }
+  }, [findNearbyStations, userLocation, entrances.length, assessments.length]);
 
   const getRiskColor = (riskLevel: string) => {
     const colors = {
@@ -115,7 +132,24 @@ export default function NearbyStationsPanel({
         </div>
         <div className="text-center py-8 text-gray-500">
           <div className="text-4xl mb-2">🗺️</div>
-          <p className="text-sm">Enable location to see nearby stations</p>
+          <p className="text-sm mb-2">Enable location to see nearby stations</p>
+          <button
+            onClick={() => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    console.log('Manual location request successful:', position.coords);
+                  },
+                  (error) => {
+                    console.error('Manual location request failed:', error);
+                  }
+                );
+              }
+            }}
+            className="text-xs bg-blue-500 text-white px-3 py-1 rounded-full hover:bg-blue-600 transition-colors"
+          >
+            Request Location
+          </button>
         </div>
       </div>
     );
@@ -130,7 +164,7 @@ export default function NearbyStationsPanel({
         </div>
         <div className="text-center py-8 text-gray-500">
           <div className="text-4xl mb-2">🚇</div>
-          <p className="text-sm">No stations found within 3km</p>
+          <p className="text-sm">No stations found within 5km</p>
         </div>
       </div>
     );
@@ -145,6 +179,14 @@ export default function NearbyStationsPanel({
           <span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
             {nearbyStations.length} found
           </span>
+        </div>
+        {userLocation && (
+          <div className="mt-2 text-xs text-gray-500">
+            Your location: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+          </div>
+        )}
+        <div className="mt-1 text-xs text-gray-500">
+          Data: {entrances.length} entrances, {assessments.length} assessments
         </div>
       </div>
 
@@ -223,7 +265,7 @@ export default function NearbyStationsPanel({
       </div>
 
       <div className="p-3 bg-gray-50 text-xs text-gray-500 text-center">
-        Showing stations within 3km • Tap to view details
+        Showing stations within 5km • Tap to view details
       </div>
     </div>
   );

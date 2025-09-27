@@ -29,10 +29,12 @@ export default function Dashboard() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const location = {
             lng: position.coords.longitude,
             lat: position.coords.latitude
-          });
+          };
+          console.log('Dashboard detected user location:', location);
+          setUserLocation(location);
           setLocationError(null);
         },
         (error) => {
@@ -107,6 +109,7 @@ export default function Dashboard() {
             Array.from(popups).forEach(popup => popup.remove());
           }}
           onUserLocationFound={(location) => {
+            console.log('FloodMap detected user location:', location);
             setUserLocation(location);
             setLocationError(null);
           }}
