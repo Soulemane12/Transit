@@ -110,15 +110,22 @@ export interface FloodZone {
 export interface CrowdsourcedReport {
   id: string;
   stationId: string;
+  stationName?: string;
   timestamp: string;
-  severity: 'minor' | 'moderate' | 'major';
-  description: string;
-  reporter: string;
+  type: 'standing_water' | 'blocked_drain' | 'overflowing_sewer' | 'infrastructure_damage' | 'other';
+  severity: 'minor' | 'moderate' | 'major' | 'critical';
+  description?: string;
+  reporter?: string;
   verified: boolean;
-  location: {
-    latitude: number;
-    longitude: number;
+  location?: {
+    coordinates: {
+      lat: number;
+      lng: number;
+    };
+    address?: string;
   };
+  waterLevel?: number;
+  contactInfo?: string;
 }
 
 export interface PredictionModel {

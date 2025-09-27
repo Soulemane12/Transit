@@ -15,10 +15,30 @@ export default function EntrancePanel({ assessment, entrance, onClose }: Entranc
   const [showReportModal, setShowReportModal] = useState(false);
 
   const handleReportSubmit = async (report: Omit<import('../types').CrowdsourcedReport, 'id' | 'timestamp'>) => {
-    // In a real application, this would send the report to a backend API
-    console.log('Submitting flood report:', report);
-    // For now, just show a success message
-    alert('Report submitted successfully! Thank you for helping improve flood monitoring.');
+    try {
+      // Save report to local storage
+      const newReport = {
+        ...report,
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        stationName: assessment.stationName
+      };
+
+      // Get existing reports from local storage
+      const existingReports = JSON.parse(localStorage.getItem('floodReports') || '[]');
+
+      // Add new report
+      existingReports.push(newReport);
+
+      // Save back to local storage
+      localStorage.setItem('floodReports', JSON.stringify(existingReports));
+
+      console.log('Flood report saved to local storage:', newReport);
+      alert('Report submitted successfully! Thank you for helping improve flood monitoring.');
+    } catch (error) {
+      console.error('Error saving flood report:', error);
+      alert('Error submitting report. Please try again.');
+    }
   };
 
   const getExitMitigationSuggestion = (entrance: SubwayEntrance) => {
@@ -65,7 +85,14 @@ export default function EntrancePanel({ assessment, entrance, onClose }: Entranc
 
 
   return (
-    <div className="absolute top-20 right-4 bottom-4 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 flex flex-col">
+    <div
+      className="absolute top-20 right-4 bottom-4 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 flex flex-col"
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseMove={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+    >
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between">

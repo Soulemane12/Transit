@@ -8,6 +8,7 @@ import FloodMap from './FloodMap';
 import type { MapRef } from './FloodMap';
 import EntrancePanel from './EntrancePanel';
 import NearbyStationsPanel from './NearbyStationsPanel';
+import FloodReportsPanel from './FloodReportsPanel';
 import {
   DEMO_USER_LOCATION,
   DEMO_SUBWAY_ENTRANCES,
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [selectedStation, setSelectedStation] = useState<{assessment: FloodRiskAssessment, entrance?: SubwayEntrance} | null>(null);
   const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(true); // Show by default for demo
   const [showStormwaterFlood, setShowStormwaterFlood] = useState(true); // Show by default for demo
+  const [showFloodReports, setShowFloodReports] = useState(false);
 
   // Debug flood zone states
   useEffect(() => {
@@ -204,6 +206,28 @@ export default function Dashboard() {
           </button>
         )}
 
+        {/* View Flood Reports Button */}
+        <button
+          onClick={() => setShowFloodReports(!showFloodReports)}
+          className="absolute right-4 bottom-4 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-full shadow-lg flex items-center space-x-2 z-20 transition-colors"
+          title="View Community Flood Reports"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+          </svg>
+          <span className="text-sm font-medium">Reports</span>
+        </button>
+
         {/* Nearby Stations Panel */}
         <NearbyStationsPanel
           userLocation={userLocation}
@@ -284,10 +308,17 @@ export default function Dashboard() {
 
       {/* Station Detail Panel */}
       {selectedStation && (
-        <EntrancePanel 
+        <EntrancePanel
           assessment={selectedStation.assessment}
           entrance={selectedStation.entrance}
           onClose={() => setSelectedStation(null)}
+        />
+      )}
+
+      {/* Flood Reports Panel */}
+      {showFloodReports && (
+        <FloodReportsPanel
+          onClose={() => setShowFloodReports(false)}
         />
       )}
     </div>

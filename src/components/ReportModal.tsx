@@ -12,10 +12,12 @@ interface ReportModalProps {
 }
 
 export default function ReportModal({ stationId, stationName, onClose, onSubmit }: ReportModalProps) {
-  const [severity, setSeverity] = useState<'minor' | 'moderate' | 'major'>('minor');
+  const [type, setType] = useState<'standing_water' | 'blocked_drain' | 'overflowing_sewer' | 'infrastructure_damage' | 'other'>('standing_water');
+  const [severity, setSeverity] = useState<'minor' | 'moderate' | 'major' | 'critical'>('minor');
   const [description, setDescription] = useState('');
   const [reporter, setReporter] = useState('');
-  const [location, setLocation] = useState({ latitude: 0, longitude: 0 });
+  const [waterLevel, setWaterLevel] = useState<number>(0);
+  const [location, setLocation] = useState({ lat: 0, lng: 0 });
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,28 +26,33 @@ export default function ReportModal({ stationId, stationName, onClose, onSubmit 
 
     try {
       // Get current location if not set
-      if (location.latitude === 0 && location.longitude === 0) {
+      if (location.lat === 0 && location.lng === 0) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             setLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
             });
           },
           () => {
             // Fallback to NYC coordinates
-            setLocation({ latitude: 40.7589, longitude: -73.9851 });
+            setLocation({ lat: 40.7589, lng: -73.9851 });
           }
         );
       }
 
       const report: Omit<CrowdsourcedReport, 'id' | 'timestamp'> = {
         stationId,
+        type,
         severity,
-        description,
+        description: description || undefined,
         reporter: reporter || 'Anonymous',
         verified: false,
-        location
+        location: {
+          coordinates: location,
+          address: `Near ${stationName}`
+        },
+        waterLevel: waterLevel > 0 ? waterLevel : undefined
       };
 
       await onSubmit(report);
