@@ -39,176 +39,79 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   const map = useRef<mapboxgl.Map | null>(null);
   const exitMarkers = useRef<CustomMarker[]>([]);
   const userLocationMarker = useRef<mapboxgl.Marker | null>(null);
-  const [userLocation, setUserLocation] = useState<{ lng: number; lat: number } | null>(null);
+  const [selectedStation, setSelectedStation] = useState<FloodRiskAssessment | null>(null);
 
+  // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-
-    // Initialize map with user's location if available, otherwise use default
-    const initialCenter = userLocation || DEFAULT_MAP_CENTER;
-    const initialZoom = userLocation ? 13 : DEFAULT_ZOOM;
-
+    
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: MAP_STYLES.STREETS,
-      center: initialCenter,
-      zoom: initialZoom
+      center: DEFAULT_MAP_CENTER,
+      zoom: DEFAULT_ZOOM
     });
 
-    // Add geolocate control
-    const geolocate = new mapboxgl.GeolocateControl({
-      positionOptions: {
-        enableHighAccuracy: true
-      },
-      trackUserLocation: true,
-      showUserHeading: true
-    });
-    
-    map.current.addControl(geolocate);
-    
-    // When geolocation is triggered, update the user's location
-    geolocate.on('geolocate', (e: GeolocationPosition) => {
-      const userLng = e.coords.longitude;
-      const userLat = e.coords.latitude;
-      const location = { lng: userLng, lat: userLat };
-      setUserLocation(location);
-      if (onUserLocationFound) {
+    // Add map controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.current.addControl(new mapboxgl.ScaleControl());
+    map.current.addControl(new mapboxgl.FullscreenControl());
+
+    // Add geolocate control if user location is enabled
+    if (onUserLocationFound) {
+      const geolocate = new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserHeading: true
+      });
+
+      map.current.addControl(geolocate);
+      
+      const onGeolocate = (e: GeolocationPosition) => {
+        const location = { 
+          lng: e.coords.longitude, 
+          lat: e.coords.latitude 
+        };
+        
         onUserLocationFound(location);
-      }
-      
-      // Add or update user location marker
-      if (map.current) {
-        if (userLocationMarker.current) {
-          userLocationMarker.current.setLngLat([userLng, userLat]);
-        } else {
-          const el = document.createElement('div');
-          el.className = 'user-location-marker';
-          userLocationMarker.current = new mapboxgl.Marker(el)
-            .setLngLat([userLng, userLat])
-            .addTo(map.current);
+        
+        // Update or create user location marker
+        if (map.current) {
+          if (userLocationMarker.current) {
+            userLocationMarker.current.setLngLat([location.lng, location.lat]);
+          } else {
+            const el = document.createElement('div');
+            el.className = 'user-location-marker';
+            userLocationMarker.current = new mapboxgl.Marker(el)
+              .setLngLat([location.lng, location.lat])
+              .addTo(map.current);
+          }
         }
-      }
-    });
-
-    map.current.on('load', () => {
-      addStationsToMap();
+      };
       
-      // Add navigation control
-      map.current?.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      geolocate.on('geolocate', onGeolocate);
       
-      // Add scale control
-      map.current?.addControl(new mapboxgl.ScaleControl());
-      
-      // Add fullscreen control
-      map.current?.addControl(new mapboxgl.FullscreenControl());
-    });
+      // Cleanup function
+      return () => {
+        geolocate.off('geolocate', onGeolocate);
+      };
+    }
 
     // Cleanup function
     return () => {
-      // Remove all exit markers
-      exitMarkers.current.forEach(marker => marker.remove());
-      exitMarkers.current = [];
-      
-      // Remove the map
       if (map.current) {
         map.current.remove();
         map.current = null;
       }
     };
-  }, []);
+  }, [onUserLocationFound]);
 
-  useEffect(() => {
-    if (map.current && entrances.length > 0 && assessments.length > 0) {
-      addStationsToMap();
-      addExitMarkers();
-    }
-  }, [entrances, assessments, forecastTime]);
-  
-
-
-  const addExitMarkers = useCallback(() => {
-    if (!map.current) return;
-    
-    // Remove any existing exit markers
-    exitMarkers.current.forEach(marker => marker.remove());
-    exitMarkers.current = [];
-    
-    // Add exit markers for each exit
-    entrances.forEach(entrance => {
-      if (entrance.Entrance_Type === 'Exit Only') {
-        // Create container for the marker
-        const container = document.createElement('div');
-        container.className = 'exit-marker-container';
-        container.style.position = 'relative';
-        container.style.zIndex = '1000'; // High z-index to be above map
-        
-        // Create the marker element
-        const el = document.createElement('div');
-        el.className = 'exit-marker';
-        el.title = `Exit at ${entrance.East_West_Street} & ${entrance.North_South_Street}`;
-        
-        // Add click handler to the container
-        container.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const stationKey = `${entrance.Station_Name}-${entrance.Line}`;
-          const assessment = assessments.find(a => a.stationId === stationKey);
-          if (assessment) {
-            onStationClick(assessment, entrance);
-          }
-        });
-        
-        // Add hover effect
-        container.addEventListener('mouseenter', () => {
-          el.style.transform = 'scale(1.3)';
-          el.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.8)';
-        });
-        
-        container.addEventListener('mouseleave', () => {
-          el.style.transform = 'scale(1)';
-          el.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.5)';
-        });
-        
-        container.appendChild(el);
-        
-        // Create and add the marker to the map
-        const marker = new mapboxgl.Marker({
-          element: container,
-          anchor: 'center'
-        })
-          .setLngLat([entrance.Entrance_Longitude, entrance.Entrance_Latitude])
-          .addTo(map.current!) as unknown as CustomMarker;
-          
-        // Store the marker for cleanup
-        exitMarkers.current.push(marker);
-      }
-    });
-  }, [entrances, assessments, onStationClick]);
-
-  useEffect(() => {
-    if (map.current) {
-      toggleFEMAFloodZones();
-    }
-  }, [showFEMAFloodZones]);
-
-  useEffect(() => {
-    if (map.current) {
-      toggleStormwaterFlood();
-    }
-  }, [showStormwaterFlood]);
-
+  // Add stations to map
   const addStationsToMap = useCallback(() => {
-    if (!map.current) return;
+    if (!map.current || entrances.length === 0 || assessments.length === 0) return;
     
-    // Remove existing stations layer if it exists
-    if (map.current.getLayer('stations-layer')) {
-      map.current.removeLayer('stations-layer');
-    }
-    if (map.current.getSource('stations')) {
-      map.current.removeSource('stations');
-    }
-
     // Remove existing layers and sources
     if (map.current.getLayer('stations-layer')) {
       map.current.removeLayer('stations-layer');
@@ -218,66 +121,54 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
     }
 
     // Group entrances by station
-    const stationGroups: Record<string, { entrances: SubwayEntrance[], assessment: FloodRiskAssessment }> = {};
-    
-    entrances.forEach(entrance => {
+    const stationGroups = entrances.reduce<Record<string, { entrances: SubwayEntrance[]; assessment?: FloodRiskAssessment }>>((acc, entrance) => {
       const stationKey = `${entrance.Station_Name}-${entrance.Line}`;
-      if (!stationGroups[stationKey]) {
-        const assessment = assessments.find(a => a.stationId === stationKey);
-        stationGroups[stationKey] = {
+      if (!acc[stationKey]) {
+        acc[stationKey] = {
           entrances: [],
-                assessment: assessment || {
-                  stationId: stationKey,
-                  stationName: entrance.Station_Name,
-                  floodProbability: 0,
-                  riskLevel: 'low',
-                  severityScore: 0,
-                  contributingFactors: {
-                    elevation: 0,
-                    distanceToWater: 0,
-                    imperviousSurface: 0,
-                    femaZone: 'X',
-                    drainageCapacity: 0,
-                    rainfallIntensity: 0
-                  },
-                  historicalFloods: [],
-                  mitigationSuggestions: []
-                }
+          assessment: assessments.find(a => a.stationId === stationKey)
         };
       }
-      stationGroups[stationKey].entrances.push(entrance);
-    });
+      acc[stationKey].entrances.push(entrance);
+      return acc;
+    }, {});
 
-    // Convert to GeoJSON
-    const geoJSONData = {
-      type: 'FeatureCollection' as const,
-      features: Object.values(stationGroups).map(({ entrances, assessment }) => ({
+    // Create GeoJSON data source
+    const geoJsonData: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: Object.entries(stationGroups).map(([key, { entrances, assessment }]) => ({
         type: 'Feature' as const,
         geometry: {
           type: 'Point' as const,
-          coordinates: [entrances[0].Entrance_Longitude, entrances[0].Entrance_Latitude]
+          coordinates: [
+            parseFloat(entrances[0].Entrance_Longitude.toString()),
+            parseFloat(entrances[0].Entrance_Latitude.toString())
+          ]
         },
         properties: {
-          stationName: entrances[0].Station_Name,
+          id: key,
+          name: entrances[0].Station_Name,
           line: entrances[0].Line,
-          routes: entrances[0].Route1 ? [entrances[0].Route1, entrances[0].Route2, entrances[0].Route3].filter(Boolean) : [],
-          totalEntrances: entrances.length,
-          floodProbability: assessment.floodProbability,
-          riskLevel: assessment.riskLevel,
-          severityScore: assessment.severityScore,
-          timeToFlood: assessment.timeToFlood,
-          assessment: assessment
+          floodProbability: assessment?.floodProbability || 0,
+          riskLevel: assessment?.riskLevel || 'low',
+          entrances: entrances.map(e => ({
+            id: e.ENTRY_ID,
+            name: e.Entrance_Type,
+            coordinates: [
+              parseFloat(e.Entrance_Longitude.toString()),
+              parseFloat(e.Entrance_Latitude.toString())
+            ]
+          }))
         }
       }))
     };
 
-    // Add source
+    // Add source and layer to map
     map.current.addSource('stations', {
       type: 'geojson',
-      data: geoJSONData
+      data: geoJsonData
     });
 
-    // Add stations layer with risk-based coloring
     map.current.addLayer({
       id: 'stations-layer',
       type: 'circle',
@@ -286,227 +177,195 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         'circle-radius': [
           'interpolate',
           ['linear'],
-          ['zoom'],
-          10, 8,
-          15, 12,
-          20, 18
+          ['get', 'floodProbability'],
+          0, 6,
+          100, 12
         ],
         'circle-color': [
-          'case',
-          ['==', ['get', 'riskLevel'], 'critical'], '#dc2626',
-          ['==', ['get', 'riskLevel'], 'high'], '#ea580c',
-          ['==', ['get', 'riskLevel'], 'medium'], '#f59e0b',
-          '#10b981'
+          'match',
+          ['get', 'riskLevel'],
+          'critical', '#dc2626',
+          'high', '#ea580c',
+          'medium', '#d97706',
+          '#16a34a' // default color for low
         ],
         'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff',
+        'circle-stroke-color': '#fff',
         'circle-opacity': 0.8
       }
     });
-    
-    // Add layer for station labels
-    map.current.addLayer({
-      id: 'station-labels',
-      type: 'symbol',
-      source: 'stations',
-      layout: {
-        'text-field': ['get', 'stationName'],
-        'text-size': 12,
-        'text-offset': [0, 1.5],
-        'text-anchor': 'top',
-        'text-allow-overlap': false,
-        'text-ignore-placement': false,
-        'text-optional': true
-      },
-      paint: {
-        'text-color': '#1f2937',
-        'text-halo-color': 'rgba(255, 255, 255, 0.8)',
-        'text-halo-width': 2
-      },
-      minzoom: 12
-    });
 
-    // Add click interaction for stations
-    map.current.on('click', 'stations-layer', (e) => {
+    // Add click handler for stations
+    const onStationClickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
       if (!e.features || e.features.length === 0 || !map.current) return;
       
       const feature = e.features[0];
-      const geometry = feature.geometry as GeoJSON.Point;
-      const properties = feature.properties as {stationKey?: string; stationName?: string};
-      const stationKey = properties?.stationKey;
+      const properties = feature.properties;
       
-      if (stationKey && geometry.coordinates) {
-        const assessment = assessments.find(a => a.stationId === stationKey);
-        if (assessment) {
-          // Show all entrances for this station
-          const stationEntrances = entrances.filter(e => 
-            `${e.Station_Name}-${e.Line}` === stationKey
-          );
-          
-          // If there's only one entrance, select it directly
-          if (stationEntrances.length === 1) {
-            onStationClick(assessment, stationEntrances[0]);
-          } else if (stationEntrances.length > 1) {
-            // Show a popup with all entrances
-            const popup = new mapboxgl.Popup()
-              .setLngLat([
-                geometry.coordinates[0],
-                geometry.coordinates[1]
-              ])
-              .setHTML(`
-                <div class="station-popup">
-                  <h3>${feature.properties?.stationName}</h3>
-                  <p>${stationEntrances.length} entrances</p>
-                  <div class="entrance-list">
-                    ${stationEntrances.map(entrance => `
-                      <div class="entrance-item" data-entrance-id="${entrance.ENTRY_ID}">
-                        ${entrance.Entrance_Type === 'Exit Only' ? '🚪 ' : '⬆️ '}
-                        ${entrance.Entrance_Location || 'Main Entrance'}
-                        ${entrance.Entrance_Type === 'Exit Only' ? ' (Exit Only)' : ''}
-                      </div>
-                    `).join('')}
-                  </div>
-                </div>
-              `)
-              .addTo(map.current!);
-              
-            // Add click handler for entrance items
-            setTimeout(() => {
-              document.querySelectorAll('.entrance-item').forEach(item => {
-                item.addEventListener('click', (e) => {
-                  const entranceId = (e.currentTarget as HTMLElement)?.dataset.entranceId;
-                  const selectedEntrance = stationEntrances.find(e => e.ENTRY_ID === entranceId);
-                  if (selectedEntrance) {
-                    onStationClick(assessment, selectedEntrance);
-                    popup.remove();
-                  }
-                });
-              });
-            }, 100);
-          }
-        }
+      if (!properties) return;
+      
+      const stationAssessment = assessments.find(a => a.stationId === properties.id);
+      if (stationAssessment) {
+        setSelectedStation(stationAssessment);
+        onStationClick(stationAssessment);
       }
-    });
+    };
 
+    // Add event listeners
+    map.current.on('click', 'stations-layer', onStationClickHandler);
+    
     // Change cursor on hover
-    map.current.on('mouseenter', 'stations-layer', () => {
+    const onMouseEnter = () => {
       if (map.current) {
         map.current.getCanvas().style.cursor = 'pointer';
       }
-    });
+    };
 
-    map.current.on('mouseleave', 'stations-layer', () => {
+    const onMouseLeave = () => {
       if (map.current) {
         map.current.getCanvas().style.cursor = '';
       }
-    });
+    };
+
+    map.current.on('mouseenter', 'stations-layer', onMouseEnter);
+    map.current.on('mouseleave', 'stations-layer', onMouseLeave);
+
+    // Cleanup function
+    return () => {
+      if (map.current) {
+        map.current.off('click', 'stations-layer', onStationClickHandler);
+        map.current.off('mouseenter', 'stations-layer', onMouseEnter);
+        map.current.off('mouseleave', 'stations-layer', onMouseLeave);
+      }
+    };
   }, [entrances, assessments, onStationClick]);
 
-  const toggleFEMAFloodZones = useCallback(async () => {
+  // Add exit markers for the selected station
+  const addExitMarkers = useCallback(() => {
+    if (!map.current || !selectedStation) return;
+    
+    // Clear existing markers
+    exitMarkers.current.forEach(marker => marker.remove());
+    exitMarkers.current = [];
+    
+    // Find entrances for the selected station
+    const stationEntrances = entrances.filter(
+      e => `${e.Station_Name}-${e.Line}` === selectedStation.stationId
+    );
+    
+    // Add markers for each entrance
+    stationEntrances.forEach(entrance => {
+      const container = document.createElement('div');
+      container.className = 'exit-marker';
+      
+      const marker = new mapboxgl.Marker({
+        element: container,
+        anchor: 'center'
+      })
+        .setLngLat([
+          parseFloat(entrance.Entrance_Longitude.toString()),
+          parseFloat(entrance.Entrance_Latitude.toString())
+        ])
+        .addTo(map.current!);
+      
+      // Add click handler
+      container.addEventListener('click', () => {
+        onStationClick(selectedStation, entrance);
+      });
+      
+      exitMarkers.current.push(marker as CustomMarker);
+    });
+  }, [selectedStation, entrances, onStationClick]);
+
+  // Toggle FEMA flood zones layer
+  const toggleFEMAFloodZones = useCallback((show: boolean) => {
+    if (!map.current) return;
+    
+    if (show) {
+      // Add FEMA flood zones layer
+      if (!map.current.getSource('fema-flood-zones')) {
+        map.current.addSource('fema-flood-zones', {
+          type: 'geojson',
+          data: 'path/to/fema-flood-zones.geojson' // Replace with actual path
+        });
+        
+        map.current.addLayer({
+          id: 'fema-flood-zones-layer',
+          type: 'fill',
+          source: 'fema-flood-zones',
+          paint: {
+            'fill-color': '#088',
+            'fill-opacity': 0.3
+          }
+        });
+      } else {
+        map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'visible');
+      }
+    } else if (map.current.getLayer('fema-flood-zones-layer')) {
+      map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'none');
+    }
+  }, []);
+
+  // Toggle stormwater flood layer
+  const toggleStormwaterFlood = useCallback((show: boolean) => {
+    if (!map.current) return;
+    
+    if (show) {
+      // Add stormwater flood layer
+      if (!map.current.getSource('stormwater-flood')) {
+        map.current.addSource('stormwater-flood', {
+          type: 'geojson',
+          data: 'path/to/stormwater-flood.geojson' // Replace with actual path
+        });
+        
+        map.current.addLayer({
+          id: 'stormwater-flood-layer',
+          type: 'fill',
+          source: 'stormwater-flood',
+          paint: {
+            'fill-color': '#00f',
+            'fill-opacity': 0.2
+          }
+        });
+      } else {
+        map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'visible');
+      }
+    } else if (map.current.getLayer('stormwater-flood-layer')) {
+      map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'none');
+    }
+  }, []);
+
+  // Update map when data changes
+  useEffect(() => {
     if (!map.current) return;
 
-    if (showFEMAFloodZones) {
-      // Add FEMA flood zones (mock data for demo)
-      const femaData: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [[
-                [-74.0059, 40.7128], [-74.0259, 40.7328], [-73.9859, 40.7528],
-                [-73.9659, 40.7328], [-74.0059, 40.7128]
-              ]]
-            },
-            properties: {
-              FLD_ZONE: 'AE',
-              FLOODWAY: 'FLOODWAY',
-              STATIC_BFE: '12'
-            }
-          }
-        ]
-      };
-
-      map.current.addSource('fema-flood-zones', {
-        type: 'geojson',
-        data: femaData
-      });
-
-      map.current.addLayer({
-        id: 'fema-flood-zones-layer',
-        type: 'fill',
-        source: 'fema-flood-zones',
-        paint: {
-          'fill-color': '#ef4444',
-          'fill-opacity': 0.3,
-          'fill-outline-color': '#dc2626'
-        }
-      });
+    const updateMapData = () => {
+      addStationsToMap();
+      if (selectedStation) {
+        addExitMarkers();
+      }
+    };
+    
+    if (map.current.loaded()) {
+      updateMapData();
     } else {
-      if (map.current.getLayer('fema-flood-zones-layer')) {
-        map.current.removeLayer('fema-flood-zones-layer');
-      }
-      if (map.current.getSource('fema-flood-zones')) {
-        map.current.removeSource('fema-flood-zones');
-      }
-    }
-  }, [showFEMAFloodZones]);
-
-  const toggleStormwaterFlood = useCallback(async () => {
-    if (!map.current) return;
-
-    if (showStormwaterFlood) {
-      // Add stormwater flood zones (mock data for demo)
-      const stormwaterData: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [[
-                [-73.9859, 40.7528], [-74.0159, 40.7728], [-73.9759, 40.7928],
-                [-73.9559, 40.7728], [-73.9859, 40.7528]
-              ]]
-            },
-            properties: {
-              depth_ft: 3.5,
-              scenario: 'Extreme Storm (3.66 in/hr)',
-              area: 'Lower Manhattan'
-            }
-          }
-        ]
+      const onLoad = () => {
+        updateMapData();
+        map.current?.off('load', onLoad);
       };
-
-      map.current.addSource('stormwater-flood-zones', {
-        type: 'geojson',
-        data: stormwaterData
-      });
-
-      map.current.addLayer({
-        id: 'stormwater-flood-zones-layer',
-        type: 'fill',
-        source: 'stormwater-flood-zones',
-        paint: {
-          'fill-color': '#3b82f6',
-          'fill-opacity': 0.4,
-          'fill-outline-color': '#2563eb'
-        }
-      });
-    } else {
-      if (map.current.getLayer('stormwater-flood-zones-layer')) {
-        map.current.removeLayer('stormwater-flood-zones-layer');
-      }
-      if (map.current.getSource('stormwater-flood-zones')) {
-        map.current.removeSource('stormwater-flood-zones');
-      }
+      map.current.on('load', onLoad);
     }
-  }, [showStormwaterFlood]);
+  }, [entrances, assessments, forecastTime, addStationsToMap, addExitMarkers, selectedStation]);
+
+  // Toggle flood layers when visibility changes
+  useEffect(() => {
+    toggleFEMAFloodZones(showFEMAFloodZones);
+    toggleStormwaterFlood(showStormwaterFlood);
+  }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood]);
 
   // Expose map methods via ref
   useImperativeHandle(ref, () => ({
-    flyTo: (options) => {
+    flyTo: (options: { center: [number, number]; zoom: number; essential?: boolean }) => {
       if (map.current) {
         map.current.flyTo({
           duration: 3000,
@@ -515,10 +374,16 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       }
     },
     getMap: () => map.current
-  }), []);
+  }));
 
-  // Cleanup function
-  return <div ref={mapContainer} className="map-container" />;
+  return (
+    <div 
+      ref={mapContainer} 
+      className="w-full h-full"
+    />
+  );
 });
+
+FloodMap.displayName = 'FloodMap';
 
 export default FloodMap;
