@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { SubwayEntrance, FloodRiskAssessment } from '../types';
 import { DEFAULT_MAP_CENTER, DEFAULT_ZOOM, MAP_STYLES } from '../lib/constants';
+
+// Extend the mapboxgl types to include the _element property
+interface CustomMarker extends Omit<mapboxgl.Marker, '_element'> {
+  _element: HTMLElement;
+}
 
 interface FloodMapProps {
   entrances: SubwayEntrance[];
@@ -25,6 +30,7 @@ export default function FloodMap({
 }: FloodMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const exitMarkers = useRef<CustomMarker[]>([]);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -42,8 +48,17 @@ export default function FloodMap({
       addStationsToMap();
     });
 
+    // Cleanup function
     return () => {
-      map.current?.remove();
+      // Remove all exit markers
+      exitMarkers.current.forEach(marker => marker.remove());
+      exitMarkers.current = [];
+      
+      // Remove the map
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, []);
 
@@ -54,20 +69,31 @@ export default function FloodMap({
     }
   }, [entrances, assessments, forecastTime]);
   
+
+
   const addExitMarkers = useCallback(() => {
     if (!map.current) return;
     
     // Remove any existing exit markers
-    document.querySelectorAll('.exit-marker').forEach(el => el.remove());
+    exitMarkers.current.forEach(marker => marker.remove());
+    exitMarkers.current = [];
     
     // Add exit markers for each exit
     entrances.forEach(entrance => {
       if (entrance.Entrance_Type === 'Exit Only') {
+        // Create container for the marker
+        const container = document.createElement('div');
+        container.className = 'exit-marker-container';
+        container.style.position = 'relative';
+        container.style.zIndex = '1000'; // High z-index to be above map
+        
+        // Create the marker element
         const el = document.createElement('div');
         el.className = 'exit-marker';
         el.title = `Exit at ${entrance.East_West_Street} & ${entrance.North_South_Street}`;
         
-        el.addEventListener('click', (e) => {
+        // Add click handler to the container
+        container.addEventListener('click', (e) => {
           e.stopPropagation();
           const stationKey = `${entrance.Station_Name}-${entrance.Line}`;
           const assessment = assessments.find(a => a.stationId === stationKey);
@@ -76,9 +102,29 @@ export default function FloodMap({
           }
         });
         
-        new mapboxgl.Marker(el)
+        // Add hover effect
+        container.addEventListener('mouseenter', () => {
+          el.style.transform = 'scale(1.3)';
+          el.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.8)';
+        });
+        
+        container.addEventListener('mouseleave', () => {
+          el.style.transform = 'scale(1)';
+          el.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.5)';
+        });
+        
+        container.appendChild(el);
+        
+        // Create and add the marker to the map
+        const marker = new mapboxgl.Marker({
+          element: container,
+          anchor: 'center'
+        })
           .setLngLat([entrance.Entrance_Longitude, entrance.Entrance_Latitude])
-          .addTo(map.current!);
+          .addTo(map.current!) as unknown as CustomMarker;
+          
+        // Store the marker for cleanup
+        exitMarkers.current.push(marker);
       }
     });
   }, [entrances, assessments, onStationClick]);
