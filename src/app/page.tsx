@@ -66,7 +66,7 @@ export default function Home() {
               return data;
             }
           }
-        } catch (e) {
+        } catch {
           console.log('Trying next endpoint...');
         }
       }
@@ -146,11 +146,11 @@ export default function Home() {
           const response = await fetch(endpoint);
           if (response.ok) {
             const data = await response.json();
-            if (data.features && data.features.length > 0 && data.features.some(f => f.geometry)) {
+            if (data.features && data.features.length > 0 && data.features.some((f: { geometry: unknown }) => f.geometry)) {
               return data;
             }
           }
-        } catch (e) {
+        } catch {
           console.log('Trying next endpoint...');
         }
       }
