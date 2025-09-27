@@ -5,6 +5,14 @@ export const API_ENDPOINTS = {
   MTA_ALERTS: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts',
   WEATHER_API: 'https://api.weatherapi.com/v1/forecast.json',
   NOAA_RAINFALL: 'https://api.weather.gov/gridpoints/OKX/33,37/forecast',
+  NYC_311_COMPLAINTS: 'https://data.cityofnewyork.us/resource/erm2-nwe9.json',
+  NYC_WATERWAY_STRUCTURES: 'https://data.cityofnewyork.us/resource/2k42-p9c5.geojson',
+  NYC_SEA_LEVEL_RISE: 'https://data.cityofnewyork.us/resource/2qyz-gyqz.geojson',
+  NYC_FLOOD_HAZARD_AREAS: 'https://data.cityofnewyork.us/resource/4q3d-vn3t.geojson',
+  NYC_STREET_FLOODING: 'https://data.cityofnewyork.us/resource/ha6r-rb3j.json',
+  NYC_TIDE_DATA: 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter',
+  USGS_STREAM_FLOW: 'https://waterservices.usgs.gov/nwis/iv/',
+  NYC_EMERGENCY_NOTIFICATIONS: 'https://data.cityofnewyork.us/resource/8end-qv57.json',
 } as const;
 
 export const RISK_THRESHOLDS = {

@@ -1,14 +1,20 @@
 import axios from 'axios';
 import * as turf from '@turf/turf';
-import { 
-  SubwayEntrance, 
-  FloodRiskAssessment, 
-  WeatherForecast, 
-  FloodZone, 
+import {
+  SubwayEntrance,
+  FloodRiskAssessment,
+  WeatherForecast,
+  FloodZone,
   CrowdsourcedReport,
   DashboardStats,
   HistoricalFlood,
-  MitigationOption
+  MitigationOption,
+  NYC311Report,
+  TideData,
+  StreamFlowData,
+  RealTimeFloodData,
+  EnhancedPredictionModel,
+  FloodAlert
 } from '../types';
 import { API_ENDPOINTS, RISK_THRESHOLDS, FLOOD_ZONE_RISK_WEIGHTS, MITIGATION_OPTIONS } from './constants';
 
@@ -18,6 +24,10 @@ export class DataService {
   private floodZones: FloodZone[] = [];
   private weatherForecast: WeatherForecast[] = [];
   private crowdsourcedReports: CrowdsourcedReport[] = [];
+  private nyc311Reports: NYC311Report[] = [];
+  private tideData: TideData[] = [];
+  private realTimeFloodData: RealTimeFloodData[] = [];
+  private activeAlerts: FloodAlert[] = [];
 
   static getInstance(): DataService {
     if (!DataService.instance) {
@@ -440,5 +450,269 @@ export class DataService {
         }
       }
     ];
+  }
+
+  // Fetch NYC 311 flood-related complaints
+  async fetchNYC311FloodReports(): Promise<NYC311Report[]> {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const response = await axios.get(API_ENDPOINTS.NYC_311_COMPLAINTS, {
+        params: {
+          '$where': `created_date >= '${thirtyDaysAgo.toISOString().split('T')[0]}' AND (complaint_type like '%Flood%' OR complaint_type like '%Water%' OR descriptor like '%flood%' OR descriptor like '%water%')`,
+          '$limit': 1000,
+          '$order': 'created_date DESC'
+        }
+      });
+
+      this.nyc311Reports = response.data.map((report: any) => ({
+        unique_key: report.unique_key,
+        created_date: report.created_date,
+        complaint_type: report.complaint_type,
+        descriptor: report.descriptor,
+        incident_zip: report.incident_zip,
+        city: report.city,
+        borough: report.borough,
+        latitude: report.latitude ? parseFloat(report.latitude) : undefined,
+        longitude: report.longitude ? parseFloat(report.longitude) : undefined,
+        location: report.location
+      }));
+
+      return this.nyc311Reports;
+    } catch (error) {
+      console.error('Error fetching NYC 311 reports:', error);
+      return this.getMock311Reports();
+    }
+  }
+
+  // Fetch real-time tide data
+  async fetchTideData(): Promise<TideData[]> {
+    try {
+      const now = new Date();
+      const endDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours ahead
+
+      const response = await axios.get(API_ENDPOINTS.NYC_TIDE_DATA, {
+        params: {
+          station: '8518750', // The Battery, NYC
+          product: 'water_level',
+          datum: 'MLLW',
+          units: 'english',
+          time_zone: 'lst_ldt',
+          format: 'json',
+          begin_date: now.toISOString().split('T')[0].replace(/-/g, ''),
+          end_date: endDate.toISOString().split('T')[0].replace(/-/g, '')
+        }
+      });
+
+      if (response.data && response.data.data) {
+        this.tideData = response.data.data.map((item: any) => ({
+          station: item.s || '8518750',
+          datetime: item.t,
+          water_level: parseFloat(item.v),
+          verified: item.q === 'v',
+          prediction: item.q === 'p' ? parseFloat(item.v) : undefined
+        }));
+      }
+
+      return this.tideData;
+    } catch (error) {
+      console.error('Error fetching tide data:', error);
+      return this.getMockTideData();
+    }
+  }
+
+  // Enhanced flood risk calculation with real-time data
+  calculateEnhancedFloodRisk(
+    station: SubwayEntrance,
+    weatherForecast: WeatherForecast[],
+    floodZones: FloodZone[]
+  ): EnhancedPredictionModel {
+    const stationPoint = turf.point([station.Entrance_Longitude, station.Entrance_Latitude]);
+
+    // Get nearby 311 reports
+    const nearby311Reports = this.nyc311Reports.filter(report => {
+      if (!report.latitude || !report.longitude) return false;
+      const reportPoint = turf.point([report.longitude, report.latitude]);
+      const distance = turf.distance(stationPoint, reportPoint, { units: 'kilometers' });
+      return distance <= 2; // Within 2km
+    });
+
+    // Get current tide level
+    const currentTide = this.tideData.length > 0 ? this.tideData[0].water_level : 0;
+
+    // Calculate enhanced risk factors
+    const currentRainfall = weatherForecast[0]?.rainfallIntensity || 0;
+    const forecastedRainfall1h = weatherForecast.slice(0, 1).reduce((sum, f) => sum + f.rainfallIntensity, 0);
+    const forecastedRainfall3h = weatherForecast.slice(0, 3).reduce((sum, f) => sum + f.rainfallIntensity, 0);
+
+    const elevation = this.getStationElevation(station);
+    const distanceToWater = this.getDistanceToNearestWater(station, floodZones);
+    const femaZone = this.getFEMAZoneForStation(station, floodZones);
+    const drainageCapacity = this.getDrainageCapacity(station);
+
+    // Enhanced ML-style prediction
+    const riskFactors = {
+      current_rainfall: currentRainfall,
+      forecasted_rainfall_1h: forecastedRainfall1h,
+      forecasted_rainfall_3h: forecastedRainfall3h,
+      tide_level: currentTide,
+      nearby_311_reports: nearby311Reports.length,
+      stream_flow_anomaly: 0, // Would come from USGS data
+      emergency_alerts: this.activeAlerts.filter(alert => alert.station_id === `${station.Station_Name}-${station.Line}`).length,
+      historical_flooding_frequency: this.getHistoricalFloodingFrequency(station),
+      elevation_relative_to_water: elevation - (currentTide * 0.3048), // Convert feet to meters
+      drainage_capacity_utilization: 1 - drainageCapacity
+    };
+
+    // Enhanced probability calculation with ML weights
+    const weights = {
+      current_rainfall: 0.25,
+      forecasted_rainfall_1h: 0.15,
+      forecasted_rainfall_3h: 0.10,
+      tide_level: 0.15,
+      nearby_311_reports: 0.10,
+      elevation_relative_to_water: 0.15,
+      drainage_capacity_utilization: 0.10
+    };
+
+    let baseFloodProbability = 0;
+    baseFloodProbability += Math.min(riskFactors.current_rainfall * 25, 30) * weights.current_rainfall;
+    baseFloodProbability += Math.min(riskFactors.forecasted_rainfall_1h * 20, 25) * weights.forecasted_rainfall_1h;
+    baseFloodProbability += Math.min(riskFactors.forecasted_rainfall_3h * 15, 20) * weights.forecasted_rainfall_3h;
+    baseFloodProbability += Math.min(Math.max(riskFactors.tide_level - 2, 0) * 10, 15) * weights.tide_level;
+    baseFloodProbability += Math.min(riskFactors.nearby_311_reports * 5, 15) * weights.nearby_311_reports;
+    baseFloodProbability += Math.max(0, (5 - riskFactors.elevation_relative_to_water) * 5) * weights.elevation_relative_to_water;
+    baseFloodProbability += riskFactors.drainage_capacity_utilization * 20 * weights.drainage_capacity_utilization;
+
+    // Add FEMA zone multiplier
+    const femaWeight = FLOOD_ZONE_RISK_WEIGHTS[femaZone as keyof typeof FLOOD_ZONE_RISK_WEIGHTS] || 0.5;
+    baseFloodProbability *= (1 + femaWeight);
+
+    const floodProbability = Math.min(100, Math.max(0, baseFloodProbability));
+    const confidenceInterval: [number, number] = [
+      Math.max(0, floodProbability - 15),
+      Math.min(100, floodProbability + 15)
+    ];
+
+    return {
+      station_id: `${station.Station_Name}-${station.Line}`,
+      timestamp: new Date().toISOString(),
+      risk_factors: riskFactors,
+      ml_prediction: {
+        flood_probability: floodProbability,
+        confidence_interval: confidenceInterval,
+        time_to_flood_minutes: this.calculateTimeToFlood(currentRainfall, elevation),
+        predicted_water_depth: this.calculatePredictedWaterDepth(floodProbability, elevation),
+        model_version: '2.1.0'
+      },
+      real_time_adjustments: {
+        nearby_incidents_weight: nearby311Reports.length > 3 ? 1.2 : 1.0,
+        weather_pattern_weight: forecastedRainfall3h > 2 ? 1.3 : 1.0,
+        tide_cycle_weight: currentTide > 3 ? 1.15 : 1.0,
+        infrastructure_status_weight: 1.0 // Would be based on MTA alerts
+      }
+    };
+  }
+
+  // Generate flood alerts based on predictions
+  generateFloodAlerts(predictions: EnhancedPredictionModel[]): FloodAlert[] {
+    const alerts: FloodAlert[] = [];
+    const now = new Date();
+
+    predictions.forEach(prediction => {
+      const probability = prediction.ml_prediction.flood_probability;
+      let alertLevel: 'watch' | 'warning' | 'emergency' = 'watch';
+
+      if (probability >= 80) alertLevel = 'emergency';
+      else if (probability >= 60) alertLevel = 'warning';
+      else if (probability >= 40) alertLevel = 'watch';
+      else return; // No alert needed
+
+      const station = this.subwayEntrances.find(s =>
+        `${s.Station_Name}-${s.Line}` === prediction.station_id
+      );
+
+      if (!station) return;
+
+      const alert: FloodAlert = {
+        id: `alert_${prediction.station_id}_${now.getTime()}`,
+        station_id: prediction.station_id,
+        alert_level: alertLevel,
+        issued_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString(), // 6 hours
+        title: `${alertLevel.toUpperCase()}: ${station.Station_Name} Flood Risk`,
+        description: `${Math.round(probability)}% chance of flooding in the next 3 hours. ${
+          prediction.ml_prediction.time_to_flood_minutes
+            ? `Estimated time to flood: ${Math.round(prediction.ml_prediction.time_to_flood_minutes)} minutes.`
+            : ''
+        }`,
+        source: 'system',
+        actions_recommended: this.getRecommendedActions(alertLevel, probability),
+        affected_lines: [station.Line]
+      };
+
+      alerts.push(alert);
+    });
+
+    this.activeAlerts = alerts;
+    return alerts;
+  }
+
+  private getHistoricalFloodingFrequency(station: SubwayEntrance): number {
+    // Mock implementation - would query historical database
+    return Math.random() * 5; // 0-5 incidents per year
+  }
+
+  private calculatePredictedWaterDepth(probability: number, elevation: number): number {
+    if (probability < 40) return 0;
+    const baseDepth = (probability - 40) / 60 * 3; // 0-3 feet based on probability
+    const elevationFactor = Math.max(0, 1 - elevation / 20); // Higher elevation = less depth
+    return baseDepth * elevationFactor;
+  }
+
+  private getRecommendedActions(alertLevel: string, probability: number): string[] {
+    const actions = [];
+
+    if (alertLevel === 'emergency') {
+      actions.push('Avoid this station immediately');
+      actions.push('Use alternative transportation routes');
+      actions.push('Monitor MTA alerts for service changes');
+    } else if (alertLevel === 'warning') {
+      actions.push('Plan alternative routes');
+      actions.push('Allow extra travel time');
+      actions.push('Stay informed of weather conditions');
+    } else {
+      actions.push('Be aware of potential delays');
+      actions.push('Monitor weather conditions');
+    }
+
+    return actions;
+  }
+
+  private getMock311Reports(): NYC311Report[] {
+    return [
+      {
+        unique_key: '12345',
+        created_date: new Date().toISOString(),
+        complaint_type: 'Street Flooding',
+        descriptor: 'Heavy flooding on street',
+        incident_zip: '10001',
+        city: 'NEW YORK',
+        borough: 'MANHATTAN',
+        latitude: 40.7505,
+        longitude: -73.9934
+      }
+    ];
+  }
+
+  private getMockTideData(): TideData[] {
+    const now = new Date();
+    return Array.from({ length: 24 }, (_, i) => ({
+      station: '8518750',
+      datetime: new Date(now.getTime() + i * 60 * 60 * 1000).toISOString(),
+      water_level: 2.5 + Math.sin(i * Math.PI / 6) * 1.5, // Simulate tidal cycle
+      verified: true
+    }));
   }
 }

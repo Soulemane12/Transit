@@ -146,3 +146,91 @@ export interface DashboardStats {
   weatherConditions: string;
   averageRiskScore: number;
 }
+
+export interface NYC311Report {
+  unique_key: string;
+  created_date: string;
+  complaint_type: string;
+  descriptor: string;
+  incident_zip: string;
+  city: string;
+  borough: string;
+  latitude?: number;
+  longitude?: number;
+  location?: {
+    coordinates: [number, number];
+  };
+}
+
+export interface TideData {
+  station: string;
+  datetime: string;
+  water_level: number;
+  prediction?: number;
+  verified: boolean;
+}
+
+export interface StreamFlowData {
+  site_no: string;
+  datetime: string;
+  flow_rate: number;
+  gage_height: number;
+  station_nm: string;
+}
+
+export interface RealTimeFloodData {
+  timestamp: string;
+  source: 'NYC311' | 'MTA' | 'USGS' | 'NOAA' | 'Emergency';
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  severity: 'minor' | 'moderate' | 'major' | 'extreme';
+  description: string;
+  affected_area?: string;
+  water_depth?: number;
+  duration_hours?: number;
+}
+
+export interface EnhancedPredictionModel {
+  station_id: string;
+  timestamp: string;
+  risk_factors: {
+    current_rainfall: number;
+    forecasted_rainfall_1h: number;
+    forecasted_rainfall_3h: number;
+    tide_level: number;
+    nearby_311_reports: number;
+    stream_flow_anomaly: number;
+    emergency_alerts: number;
+    historical_flooding_frequency: number;
+    elevation_relative_to_water: number;
+    drainage_capacity_utilization: number;
+  };
+  ml_prediction: {
+    flood_probability: number;
+    confidence_interval: [number, number];
+    time_to_flood_minutes?: number;
+    predicted_water_depth?: number;
+    model_version: string;
+  };
+  real_time_adjustments: {
+    nearby_incidents_weight: number;
+    weather_pattern_weight: number;
+    tide_cycle_weight: number;
+    infrastructure_status_weight: number;
+  };
+}
+
+export interface FloodAlert {
+  id: string;
+  station_id: string;
+  alert_level: 'watch' | 'warning' | 'emergency';
+  issued_at: string;
+  expires_at?: string;
+  title: string;
+  description: string;
+  source: 'system' | 'MTA' | 'NYC_Emergency' | 'NWS';
+  actions_recommended: string[];
+  affected_lines: string[];
+}
