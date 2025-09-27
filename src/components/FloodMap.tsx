@@ -28,6 +28,7 @@ interface FloodMapProps {
 export interface MapRef {
   flyTo: (options: { center: [number, number]; zoom: number; essential?: boolean }) => void;
   getMap: () => mapboxgl.Map | null;
+  getUserLocation: () => { lng: number; lat: number } | null;
 }
 
 const FloodMap = forwardRef<MapRef, FloodMapProps>(({
@@ -52,6 +53,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   const [selectedStation, setSelectedStation] = useState<FloodRiskAssessment | null>(null);
   const [, setHoveredStation] = useState<string | null>(null);
   const [, setActiveAlerts] = useState<FloodAlert[]>([]);
+  const [userLocation, setUserLocation] = useState<{ lng: number; lat: number } | null>(null);
 
   // Create detailed popup content for stations
   const createStationPopupContent = (assessment: FloodRiskAssessment, stationEntrances: SubwayEntrance[]) => {
@@ -154,6 +156,8 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
           lng: e.coords.longitude,
           lat: e.coords.latitude
         };
+
+        setUserLocation(location);
 
         if (onUserLocationFound) {
           onUserLocationFound(location);
@@ -861,7 +865,8 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         });
       }
     },
-    getMap: () => map.current
+    getMap: () => map.current,
+    getUserLocation: () => userLocation
   }));
 
   return (
