@@ -948,173 +948,165 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
   // Toggle FEMA flood zones layer
   const toggleFEMAFloodZones = useCallback((show: boolean) => {
-    const floodZoneOperation = () => {
-      if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current || !map.current.isStyleLoaded()) return;
 
-      console.log('Toggling FEMA flood zones:', show);
+    console.log('Toggling FEMA flood zones:', show);
 
-      try {
-        if (show) {
-          // Add FEMA flood zones layer
-          if (!map.current.getSource('fema-flood-zones')) {
-            console.log('Adding FEMA flood zones source and layer');
-            // Create FEMA flood zone around Grand Central and nearby area
-            const demoFloodZone = {
-              type: 'FeatureCollection' as const,
-              features: [{
-                type: 'Feature' as const,
-                geometry: {
-                  type: 'Polygon' as const,
-                  coordinates: [[
-                    [-73.9850, 40.7480],
-                    [-73.9700, 40.7480],
-                    [-73.9700, 40.7580],
-                    [-73.9850, 40.7580],
-                    [-73.9850, 40.7480]
-                  ]]
-                },
-                properties: {
-                  zone: 'AE',
-                  description: 'FEMA Flood Zone AE - Grand Central Area'
-                }
-              }]
-            };
+    try {
+      if (show) {
+        // Add FEMA flood zones layer
+        if (!map.current.getSource('fema-flood-zones')) {
+          console.log('Adding FEMA flood zones source and layer');
+          // Create FEMA flood zone around Grand Central and nearby area
+          const demoFloodZone = {
+            type: 'FeatureCollection' as const,
+            features: [{
+              type: 'Feature' as const,
+              geometry: {
+                type: 'Polygon' as const,
+                coordinates: [[
+                  [-73.9850, 40.7480],
+                  [-73.9700, 40.7480],
+                  [-73.9700, 40.7580],
+                  [-73.9850, 40.7580],
+                  [-73.9850, 40.7480]
+                ]]
+              },
+              properties: {
+                zone: 'AE',
+                description: 'FEMA Flood Zone AE - Grand Central Area'
+              }
+            }]
+          };
 
-          map.current.addSource('fema-flood-zones', {
-            type: 'geojson',
-            data: demoFloodZone
-          });
+        map.current.addSource('fema-flood-zones', {
+          type: 'geojson',
+          data: demoFloodZone
+        });
 
-          map.current.addLayer({
-            id: 'fema-flood-zones-layer',
-            type: 'fill',
-            source: 'fema-flood-zones',
-            paint: {
-              'fill-color': '#dc2626',
-              'fill-opacity': 0.3,
-              'fill-outline-color': '#dc2626'
-            }
-          });
-
-          // Add border layer for better visibility
-          map.current.addLayer({
-            id: 'fema-flood-zones-border',
-            type: 'line',
-            source: 'fema-flood-zones',
-            paint: {
-              'line-color': '#dc2626',
-              'line-width': 2,
-              'line-opacity': 0.8
-            }
-          });
-
-          console.log('FEMA flood zones layer added successfully');
-        } else if (map.current.getLayer('fema-flood-zones-layer')) {
-          map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'visible');
-          if (map.current.getLayer('fema-flood-zones-border')) {
-            map.current.setLayoutProperty('fema-flood-zones-border', 'visibility', 'visible');
+        map.current.addLayer({
+          id: 'fema-flood-zones-layer',
+          type: 'fill',
+          source: 'fema-flood-zones',
+          paint: {
+            'fill-color': '#dc2626',
+            'fill-opacity': 0.3,
+            'fill-outline-color': '#dc2626'
           }
-          console.log('FEMA flood zones layer made visible');
-        }
-      } else if (map.current.getLayer('fema-flood-zones-layer')) {
-        map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'none');
-        if (map.current.getLayer('fema-flood-zones-border')) {
-          map.current.setLayoutProperty('fema-flood-zones-border', 'visibility', 'none');
-        }
-        console.log('FEMA flood zones layer hidden');
-      }
-      } catch (error) {
-        console.warn('Error toggling FEMA flood zones:', error);
-      }
-    };
+        });
 
-    queueMapOperation(floodZoneOperation);
-  }, [queueMapOperation]);
+        // Add border layer for better visibility
+        map.current.addLayer({
+          id: 'fema-flood-zones-border',
+          type: 'line',
+          source: 'fema-flood-zones',
+          paint: {
+            'line-color': '#dc2626',
+            'line-width': 2,
+            'line-opacity': 0.8
+          }
+        });
+
+        console.log('FEMA flood zones layer added successfully');
+      } else if (map.current.getLayer('fema-flood-zones-layer')) {
+        map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'visible');
+        if (map.current.getLayer('fema-flood-zones-border')) {
+          map.current.setLayoutProperty('fema-flood-zones-border', 'visibility', 'visible');
+        }
+        console.log('FEMA flood zones layer made visible');
+      }
+    } else if (map.current.getLayer('fema-flood-zones-layer')) {
+      map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'none');
+      if (map.current.getLayer('fema-flood-zones-border')) {
+        map.current.setLayoutProperty('fema-flood-zones-border', 'visibility', 'none');
+      }
+      console.log('FEMA flood zones layer hidden');
+    }
+    } catch (error) {
+      console.warn('Error toggling FEMA flood zones:', error);
+    }
+  }, []);
 
   // Toggle stormwater flood layer
   const toggleStormwaterFlood = useCallback((show: boolean) => {
-    const stormwaterOperation = () => {
-      if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current || !map.current.isStyleLoaded()) return;
 
-      console.log('Toggling stormwater flood:', show);
+    console.log('Toggling stormwater flood:', show);
 
-      try {
-        if (show) {
-          // Add stormwater flood layer
-          if (!map.current.getSource('stormwater-flood')) {
-            console.log('Adding stormwater flood source and layer');
-            // Create stormwater flood area around Grand Central (different area from FEMA)
-            const demoStormwaterFlood = {
-              type: 'FeatureCollection' as const,
-              features: [{
-                type: 'Feature' as const,
-                geometry: {
-                  type: 'Polygon' as const,
-                  coordinates: [[
-                    [-73.9800, 40.7500],
-                    [-73.9720, 40.7500],
-                    [-73.9720, 40.7560],
-                    [-73.9800, 40.7560],
-                    [-73.9800, 40.7500]
-                  ]]
-                },
-                properties: {
-                  type: 'stormwater',
-                  description: 'Stormwater Flood Risk Area - Midtown East'
-                }
-              }]
-            };
+    try {
+      if (show) {
+        // Add stormwater flood layer
+        if (!map.current.getSource('stormwater-flood')) {
+          console.log('Adding stormwater flood source and layer');
+          // Create stormwater flood area around Grand Central (different area from FEMA)
+          const demoStormwaterFlood = {
+            type: 'FeatureCollection' as const,
+            features: [{
+              type: 'Feature' as const,
+              geometry: {
+                type: 'Polygon' as const,
+                coordinates: [[
+                  [-73.9800, 40.7500],
+                  [-73.9720, 40.7500],
+                  [-73.9720, 40.7560],
+                  [-73.9800, 40.7560],
+                  [-73.9800, 40.7500]
+                ]]
+              },
+              properties: {
+                type: 'stormwater',
+                description: 'Stormwater Flood Risk Area - Midtown East'
+              }
+            }]
+          };
 
-          map.current.addSource('stormwater-flood', {
-            type: 'geojson',
-            data: demoStormwaterFlood
-          });
+        map.current.addSource('stormwater-flood', {
+          type: 'geojson',
+          data: demoStormwaterFlood
+        });
 
-          map.current.addLayer({
-            id: 'stormwater-flood-layer',
-            type: 'fill',
-            source: 'stormwater-flood',
-            paint: {
-              'fill-color': '#3b82f6',
-              'fill-opacity': 0.25,
-              'fill-outline-color': '#3b82f6'
-            }
-          });
-
-          // Add border layer for better visibility
-          map.current.addLayer({
-            id: 'stormwater-flood-border',
-            type: 'line',
-            source: 'stormwater-flood',
-            paint: {
-              'line-color': '#3b82f6',
-              'line-width': 2,
-              'line-opacity': 0.8
-            }
-          });
-
-          console.log('Stormwater flood layer added successfully');
-        } else if (map.current.getLayer('stormwater-flood-layer')) {
-          map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'visible');
-          if (map.current.getLayer('stormwater-flood-border')) {
-            map.current.setLayoutProperty('stormwater-flood-border', 'visibility', 'visible');
+        map.current.addLayer({
+          id: 'stormwater-flood-layer',
+          type: 'fill',
+          source: 'stormwater-flood',
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0.25,
+            'fill-outline-color': '#3b82f6'
           }
-          console.log('Stormwater flood layer made visible');
-        }
-      } else if (map.current.getLayer('stormwater-flood-layer')) {
-        map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'none');
-        if (map.current.getLayer('stormwater-flood-border')) {
-          map.current.setLayoutProperty('stormwater-flood-border', 'visibility', 'none');
-        }
-        console.log('Stormwater flood layer hidden');
-      }
-      } catch (error) {
-        console.warn('Error toggling stormwater flood layer:', error);
-      }
-    };
+        });
 
-    queueMapOperation(stormwaterOperation);
-  }, [queueMapOperation]);
+        // Add border layer for better visibility
+        map.current.addLayer({
+          id: 'stormwater-flood-border',
+          type: 'line',
+          source: 'stormwater-flood',
+          paint: {
+            'line-color': '#3b82f6',
+            'line-width': 2,
+            'line-opacity': 0.8
+          }
+        });
+
+        console.log('Stormwater flood layer added successfully');
+      } else if (map.current.getLayer('stormwater-flood-layer')) {
+        map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'visible');
+        if (map.current.getLayer('stormwater-flood-border')) {
+          map.current.setLayoutProperty('stormwater-flood-border', 'visibility', 'visible');
+        }
+        console.log('Stormwater flood layer made visible');
+      }
+    } else if (map.current.getLayer('stormwater-flood-layer')) {
+      map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'none');
+      if (map.current.getLayer('stormwater-flood-border')) {
+        map.current.setLayoutProperty('stormwater-flood-border', 'visibility', 'none');
+      }
+      console.log('Stormwater flood layer hidden');
+    }
+    } catch (error) {
+      console.warn('Error toggling stormwater flood layer:', error);
+    }
+  }, []);
 
   // Update map when data changes
   useEffect(() => {
@@ -1128,11 +1120,10 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
   // Toggle flood layers when visibility changes
   useEffect(() => {
-    console.log('FloodMap effect - Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
-    console.log('Map ready state:', mapReady);
+    console.log('Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
     toggleFEMAFloodZones(showFEMAFloodZones);
     toggleStormwaterFlood(showStormwaterFlood);
-  }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood, mapReady]);
+  }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood]);
 
   // Expose map methods via ref
   useImperativeHandle(ref, () => ({
