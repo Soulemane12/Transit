@@ -202,7 +202,8 @@ export class DataService {
         distanceToWater,
         imperviousSurface,
         femaZone,
-        drainageCapacity
+        drainageCapacity,
+        rainfallIntensity
       },
       historicalFloods,
       mitigationSuggestions: this.getMitigationSuggestions(riskLevel, femaZone, imperviousSurface)
@@ -298,8 +299,22 @@ export class DataService {
         date: '2021-09-01',
         severity: 'major',
         duration: 6,
-        description: 'Hurricane Ida flooding',
+        description: 'Ida Storm',
         source: 'MTA'
+      },
+      {
+        date: '2012-10-29',
+        severity: 'major',
+        duration: 12,
+        description: 'Hurricane Sandy',
+        source: 'MTA'
+      },
+      {
+        date: '2023-07-15',
+        severity: 'moderate',
+        duration: 3,
+        description: 'Summer thunderstorm',
+        source: '311'
       }
     ];
   }
@@ -317,20 +332,38 @@ export class DataService {
     const suggestions = [];
     
     if (riskLevel === 'high' || riskLevel === 'critical') {
-      suggestions.push(MITIGATION_OPTIONS[0]); // Modular barrier
-      suggestions.push(MITIGATION_OPTIONS[5]); // Pump system
+      suggestions.push({
+        ...MITIGATION_OPTIONS[0],
+        description: 'Deploy modular flood barrier at station entrance'
+      }); // Modular barrier
+      suggestions.push({
+        ...MITIGATION_OPTIONS[5],
+        description: 'Install emergency pump system for flood events'
+      }); // Pump system
     }
     
     if (femaZone === 'AE' || femaZone === 'VE') {
-      suggestions.push(MITIGATION_OPTIONS[3]); // Platform elevation
+      suggestions.push({
+        ...MITIGATION_OPTIONS[3],
+        description: 'Raise station platform above flood level'
+      }); // Platform elevation
     }
     
     if (imperviousSurface > 0.7) {
-      suggestions.push(MITIGATION_OPTIONS[1]); // Rain garden
-      suggestions.push(MITIGATION_OPTIONS[2]); // Permeable pavers
+      suggestions.push({
+        ...MITIGATION_OPTIONS[1],
+        description: 'Install rain garden to absorb stormwater runoff'
+      }); // Rain garden
+      suggestions.push({
+        ...MITIGATION_OPTIONS[2],
+        description: 'Replace impervious surfaces with permeable materials'
+      }); // Permeable pavers
     }
     
-    suggestions.push(MITIGATION_OPTIONS[4]); // Flood sensors
+    suggestions.push({
+      ...MITIGATION_OPTIONS[4],
+      description: 'Install real-time water level monitoring system'
+    }); // Flood sensors
     
     return suggestions.slice(0, 3); // Return top 3 suggestions
   }

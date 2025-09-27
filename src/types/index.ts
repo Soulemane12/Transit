@@ -46,6 +46,7 @@ export interface FloodRiskAssessment {
     imperviousSurface: number;
     femaZone: string;
     drainageCapacity: number;
+    rainfallIntensity: number;
   };
   historicalFloods: HistoricalFlood[];
   mitigationSuggestions: MitigationOption[];

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { FloodRiskAssessment } from '../types';
-import { X, AlertTriangle, Clock, MapPin, Droplets, Shield, DollarSign, Calendar, MessageSquare } from 'lucide-react';
+import { X, AlertTriangle, MapPin, Droplets, Shield, DollarSign, Calendar, MessageSquare } from 'lucide-react';
 import ReportModal from './ReportModal';
 
 interface EntrancePanelProps {
@@ -47,14 +47,6 @@ export default function EntrancePanel({ assessment, onClose }: EntrancePanelProp
     }).format(amount);
   };
 
-  const formatTime = (minutes: number) => {
-    if (minutes < 60) {
-      return `${Math.round(minutes)} minutes`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}h ${mins}m`;
-  };
 
   return (
     <div className="absolute top-20 right-4 bottom-4 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 flex flex-col">
@@ -84,50 +76,64 @@ export default function EntrancePanel({ assessment, onClose }: EntrancePanelProp
           </div>
         </div>
 
-        {/* Risk Metrics */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Droplets className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-gray-700">Flood Probability</span>
+        {/* Predicted Risk */}
+        <div className="mb-6">
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <Droplets className="w-5 h-5 text-blue-600" />
+              <span className="text-lg font-semibold text-blue-900">Predicted Risk</span>
             </div>
-            <span className="text-lg font-bold text-gray-900">{Math.round(assessment.floodProbability)}%</span>
+            <p className="text-blue-800 text-lg">
+              {Math.round(assessment.floodProbability)}% flooding probability during {assessment.contributingFactors.rainfallIntensity?.toFixed(1) || '2.0'}&quot; /hour rainfall.
+            </p>
           </div>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-orange-600" />
-              <span className="text-sm font-medium text-gray-700">Severity Score</span>
-            </div>
-            <span className="text-lg font-bold text-gray-900">{assessment.severityScore.toFixed(1)}/10</span>
-          </div>
-
-          {assessment.timeToFlood && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium text-gray-700">Time to Flood</span>
+        {/* Last Major Disruption */}
+        {assessment.historicalFloods.length > 0 && (
+          <div className="mb-6">
+            <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
+                <span className="text-lg font-semibold text-orange-900">Last Major Disruption</span>
               </div>
-              <span className="text-lg font-bold text-gray-900">{formatTime(assessment.timeToFlood)}</span>
+              <p className="text-orange-800 text-lg">
+                {assessment.historicalFloods[0].description}, {assessment.historicalFloods[0].date.split('-')[0]}.
+              </p>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Risk Progress Bar */}
-          <div className="mt-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>Risk Level</span>
-              <span>{Math.round(assessment.floodProbability)}%</span>
+        {/* Suggested Intervention */}
+        {assessment.mitigationSuggestions.length > 0 && (
+          <div className="mb-6">
+            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Shield className="w-5 h-5 text-green-600" />
+                <span className="text-lg font-semibold text-green-900">Suggested Intervention</span>
+              </div>
+              <p className="text-green-800 text-lg">
+                {assessment.mitigationSuggestions[0].description} at {assessment.stationName} entrance.
+              </p>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className={`h-3 rounded-full transition-all duration-500 ${
-                  assessment.riskLevel === 'critical' ? 'bg-red-500' :
-                  assessment.riskLevel === 'high' ? 'bg-orange-500' :
-                  assessment.riskLevel === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                }`}
-                style={{ width: `${assessment.floodProbability}%` }}
-              ></div>
-            </div>
+          </div>
+        )}
+
+        {/* Risk Progress Bar */}
+        <div className="mt-4">
+          <div className="flex justify-between text-sm text-gray-600 mb-1">
+            <span>Risk Level</span>
+            <span>{Math.round(assessment.floodProbability)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div 
+              className={`h-3 rounded-full transition-all duration-500 ${
+                assessment.riskLevel === 'critical' ? 'bg-red-500' :
+                assessment.riskLevel === 'high' ? 'bg-orange-500' :
+                assessment.riskLevel === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+              }`}
+              style={{ width: `${assessment.floodProbability}%` }}
+            ></div>
           </div>
         </div>
       </div>

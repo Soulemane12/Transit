@@ -85,22 +85,23 @@ export default function FloodMap({
         const assessment = assessments.find(a => a.stationId === stationKey);
         stationGroups[stationKey] = {
           entrances: [],
-          assessment: assessment || {
-            stationId: stationKey,
-            stationName: entrance.Station_Name,
-            floodProbability: 0,
-            riskLevel: 'low',
-            severityScore: 0,
-            contributingFactors: {
-              elevation: 0,
-              distanceToWater: 0,
-              imperviousSurface: 0,
-              femaZone: 'X',
-              drainageCapacity: 0
-            },
-            historicalFloods: [],
-            mitigationSuggestions: []
-          }
+                assessment: assessment || {
+                  stationId: stationKey,
+                  stationName: entrance.Station_Name,
+                  floodProbability: 0,
+                  riskLevel: 'low',
+                  severityScore: 0,
+                  contributingFactors: {
+                    elevation: 0,
+                    distanceToWater: 0,
+                    imperviousSurface: 0,
+                    femaZone: 'X',
+                    drainageCapacity: 0,
+                    rainfallIntensity: 0
+                  },
+                  historicalFloods: [],
+                  mitigationSuggestions: []
+                }
         };
       }
       stationGroups[stationKey].entrances.push(entrance);
