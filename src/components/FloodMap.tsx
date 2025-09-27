@@ -85,6 +85,9 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         console.error(`Error executing pending operation ${index}:`, error);
       }
     });
+
+    // Flood zones will be initialized by the separate useEffect
+    console.log('Map ready - pending operations executed');
   }, []);
 
   // Create detailed popup content for stations
@@ -1125,10 +1128,11 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
   // Toggle flood layers when visibility changes
   useEffect(() => {
-    console.log('Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
+    console.log('FloodMap effect - Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
+    console.log('Map ready state:', mapReady);
     toggleFEMAFloodZones(showFEMAFloodZones);
     toggleStormwaterFlood(showStormwaterFlood);
-  }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood]);
+  }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood, mapReady]);
 
   // Expose map methods via ref
   useImperativeHandle(ref, () => ({

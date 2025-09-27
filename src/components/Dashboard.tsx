@@ -24,6 +24,11 @@ export default function Dashboard() {
   const [selectedStation, setSelectedStation] = useState<{assessment: FloodRiskAssessment, entrance?: SubwayEntrance} | null>(null);
   const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(true); // Show by default for demo
   const [showStormwaterFlood, setShowStormwaterFlood] = useState(true); // Show by default for demo
+
+  // Debug flood zone states
+  useEffect(() => {
+    console.log('Flood zone states:', { showFEMAFloodZones, showStormwaterFlood });
+  }, [showFEMAFloodZones, showStormwaterFlood]);
   const [userLocation, setUserLocation] = useState<{lng: number; lat: number} | null>(DEMO_USER_LOCATION);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -211,7 +216,10 @@ export default function Dashboard() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={showFEMAFloodZones}
-                onChange={() => setShowFEMAFloodZones(!showFEMAFloodZones)}
+                onChange={() => {
+                  console.log('FEMA toggle clicked, current state:', showFEMAFloodZones, 'new state:', !showFEMAFloodZones);
+                  setShowFEMAFloodZones(!showFEMAFloodZones);
+                }}
               />
               <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-500"></div>
               <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">FEMA Flood Zones</span>
@@ -221,7 +229,10 @@ export default function Dashboard() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={showStormwaterFlood}
-                onChange={() => setShowStormwaterFlood(!showStormwaterFlood)}
+                onChange={() => {
+                  console.log('Stormwater toggle clicked, current state:', showStormwaterFlood, 'new state:', !showStormwaterFlood);
+                  setShowStormwaterFlood(!showStormwaterFlood);
+                }}
               />
               <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
               <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Stormwater Flood</span>
