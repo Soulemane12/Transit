@@ -11,7 +11,6 @@ import {
   MitigationOption,
   NYC311Report,
   TideData,
-  StreamFlowData,
   RealTimeFloodData,
   EnhancedPredictionModel,
   FloodAlert
@@ -466,17 +465,17 @@ export class DataService {
         }
       });
 
-      this.nyc311Reports = response.data.map((report: any) => ({
-        unique_key: report.unique_key,
-        created_date: report.created_date,
-        complaint_type: report.complaint_type,
-        descriptor: report.descriptor,
-        incident_zip: report.incident_zip,
-        city: report.city,
-        borough: report.borough,
-        latitude: report.latitude ? parseFloat(report.latitude) : undefined,
-        longitude: report.longitude ? parseFloat(report.longitude) : undefined,
-        location: report.location
+      this.nyc311Reports = response.data.map((report: Record<string, unknown>) => ({
+        unique_key: String(report.unique_key || ''),
+        created_date: String(report.created_date || ''),
+        complaint_type: String(report.complaint_type || ''),
+        descriptor: String(report.descriptor || ''),
+        incident_zip: String(report.incident_zip || ''),
+        city: String(report.city || ''),
+        borough: String(report.borough || ''),
+        latitude: report.latitude ? parseFloat(String(report.latitude)) : undefined,
+        longitude: report.longitude ? parseFloat(String(report.longitude)) : undefined,
+        location: report.location as { coordinates: [number, number] } | undefined
       }));
 
       return this.nyc311Reports;
@@ -506,12 +505,12 @@ export class DataService {
       });
 
       if (response.data && response.data.data) {
-        this.tideData = response.data.data.map((item: any) => ({
-          station: item.s || '8518750',
-          datetime: item.t,
-          water_level: parseFloat(item.v),
+        this.tideData = response.data.data.map((item: Record<string, unknown>) => ({
+          station: String(item.s || '8518750'),
+          datetime: String(item.t || ''),
+          water_level: parseFloat(String(item.v || '0')),
           verified: item.q === 'v',
-          prediction: item.q === 'p' ? parseFloat(item.v) : undefined
+          prediction: item.q === 'p' ? parseFloat(String(item.v || '0')) : undefined
         }));
       }
 
@@ -547,7 +546,6 @@ export class DataService {
     const forecastedRainfall3h = weatherForecast.slice(0, 3).reduce((sum, f) => sum + f.rainfallIntensity, 0);
 
     const elevation = this.getStationElevation(station);
-    const distanceToWater = this.getDistanceToNearestWater(station, floodZones);
     const femaZone = this.getFEMAZoneForStation(station, floodZones);
     const drainageCapacity = this.getDrainageCapacity(station);
 
@@ -659,7 +657,7 @@ export class DataService {
     return alerts;
   }
 
-  private getHistoricalFloodingFrequency(station: SubwayEntrance): number {
+  private getHistoricalFloodingFrequency(_station: SubwayEntrance): number {
     // Mock implementation - would query historical database
     return Math.random() * 5; // 0-5 incidents per year
   }
@@ -671,7 +669,7 @@ export class DataService {
     return baseDepth * elevationFactor;
   }
 
-  private getRecommendedActions(alertLevel: string, probability: number): string[] {
+  private getRecommendedActions(alertLevel: string, _probability: number): string[] {
     const actions = [];
 
     if (alertLevel === 'emergency') {

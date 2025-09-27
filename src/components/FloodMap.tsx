@@ -51,7 +51,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   const currentPopup = useRef<mapboxgl.Popup | null>(null);
   const [selectedStation, setSelectedStation] = useState<FloodRiskAssessment | null>(null);
   const [hoveredStation, setHoveredStation] = useState<string | null>(null);
-  const [activeAlerts, setActiveAlerts] = useState<FloodAlert[]>([]);
+  const [, setActiveAlerts] = useState<FloodAlert[]>([]);
 
   // Create detailed popup content for stations
   const createStationPopupContent = (assessment: FloodRiskAssessment, stationEntrances: SubwayEntrance[]) => {
@@ -436,7 +436,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   }, [entrances, assessments, onStationClick]);
 
   // Create entrance popup content
-  const createEntrancePopupContent = (entrance: SubwayEntrance, assessment: FloodRiskAssessment) => {
+  const createEntrancePopupContent = useCallback((entrance: SubwayEntrance, assessment: FloodRiskAssessment) => {
     const riskColor = {
       'low': '#16a34a',
       'medium': '#d97706',
@@ -488,7 +488,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         </div>
       </div>
     `;
-  };
+  }, []);
 
   // Add exit markers for the selected station
   const addExitMarkers = useCallback(() => {
@@ -511,7 +511,6 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       // Style the exit marker based on entrance type and accessibility
       const isADA = entrance.ADA === 'Yes';
       const isExitOnly = entrance.Exit_Only === 'Yes';
-      const isEntryExit = entrance.Entry === 'Yes' && entrance.Exit_Only === 'No';
 
       container.style.cssText = `
         width: 16px;
