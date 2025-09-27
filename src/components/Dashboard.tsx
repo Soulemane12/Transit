@@ -134,7 +134,7 @@ export default function Dashboard() {
           floodAlerts={DEMO_FLOOD_ALERTS}
           showFloodAlerts={true}
           enableUserLocation={true}
-          autoLocateUser={false}
+          autoLocateUser={true}
         />
         
         {/* Location error message */}
@@ -163,6 +163,24 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Find My Location Button */}
+        {userLocation && (
+          <button
+            onClick={() => {
+              if (mapRef.current) {
+                mapRef.current.flyTo({
+                  center: [userLocation.lng, userLocation.lat],
+                  zoom: 16
+                });
+              }
+            }}
+            className="absolute left-4 top-20 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-20 transition-colors"
+          >
+            <span className="text-lg">📍</span>
+            <span className="font-medium text-sm">Find Me</span>
+          </button>
+        )}
+
         {/* Nearby Stations Panel */}
         <NearbyStationsPanel
           userLocation={userLocation}
@@ -178,11 +196,11 @@ export default function Dashboard() {
               });
             }
           }}
-          className="absolute left-4 top-32 w-80 max-w-sm z-10"
+          className="absolute left-4 top-36 w-80 max-w-sm z-10"
         />
 
         {/* Flood Layer Controls */}
-        <div className="absolute top-32 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
+        <div className="absolute top-20 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
           <h3 className="font-bold text-base mb-4 text-gray-800 flex items-center">
             <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
             Map Layers

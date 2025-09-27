@@ -194,13 +194,13 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
         positionOptions: {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 300000
+          maximumAge: 60000 // Refresh location every minute
         },
         trackUserLocation: true,
         showUserHeading: true,
-        showAccuracyCircle: true,
+        showAccuracyCircle: false, // Hide default accuracy circle since we have custom marker
         fitBoundsOptions: {
-          maxZoom: 15
+          maxZoom: 16
         }
       });
 
@@ -218,29 +218,80 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
           onUserLocationFound(location);
         }
 
-        // Update or create user location marker with custom styling
+        // Update or create user location marker with enhanced styling
         if (map.current) {
           if (userLocationMarker.current) {
             userLocationMarker.current.setLngLat([location.lng, location.lat]);
           } else {
-            const el = document.createElement('div');
-            el.className = 'user-location-marker';
-            el.style.cssText = `
-              width: 20px;
-              height: 20px;
-              background: #007cbf;
-              border: 3px solid #fff;
-              border-radius: 50%;
-              box-shadow: 0 0 10px rgba(0, 124, 191, 0.5);
+            const container = document.createElement('div');
+            container.className = 'user-location-container';
+            container.style.cssText = `
+              position: relative;
               cursor: pointer;
             `;
 
-            userLocationMarker.current = new mapboxgl.Marker(el)
+            // Create pulsing outer ring
+            const pulseRing = document.createElement('div');
+            pulseRing.className = 'user-location-pulse';
+            pulseRing.style.cssText = `
+              position: absolute;
+              top: -15px;
+              left: -15px;
+              width: 50px;
+              height: 50px;
+              background: rgba(0, 124, 191, 0.3);
+              border-radius: 50%;
+              animation: locationPulse 2s infinite;
+              z-index: 1;
+            `;
+
+            // Create main location dot
+            const locationDot = document.createElement('div');
+            locationDot.className = 'user-location-dot';
+            locationDot.style.cssText = `
+              position: relative;
+              width: 20px;
+              height: 20px;
+              background: #007cbf;
+              border: 4px solid #fff;
+              border-radius: 50%;
+              box-shadow: 0 2px 12px rgba(0, 124, 191, 0.7);
+              z-index: 2;
+            `;
+
+            // Create "YOU ARE HERE" label
+            const label = document.createElement('div');
+            label.className = 'user-location-label';
+            label.style.cssText = `
+              position: absolute;
+              top: -35px;
+              left: 50%;
+              transform: translateX(-50%);
+              background: #007cbf;
+              color: white;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 10px;
+              font-weight: bold;
+              white-space: nowrap;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+              z-index: 3;
+            `;
+            label.textContent = 'YOU ARE HERE';
+
+            container.appendChild(pulseRing);
+            container.appendChild(locationDot);
+            container.appendChild(label);
+
+            userLocationMarker.current = new mapboxgl.Marker({
+              element: container,
+              anchor: 'center'
+            })
               .setLngLat([location.lng, location.lat])
               .addTo(map.current);
 
             // Add click handler to user location marker
-            el.addEventListener('click', () => {
+            container.addEventListener('click', () => {
               if (map.current) {
                 map.current.flyTo({
                   center: [location.lng, location.lat],
@@ -1053,6 +1104,21 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
           }
           100% {
             box-shadow: 0 0 15px rgba(220, 38, 38, 0.6);
+          }
+        }
+
+        @keyframes locationPulse {
+          0% {
+            transform: scale(0.8);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.2);
+            opacity: 0.6;
+          }
+          100% {
+            transform: scale(0.8);
+            opacity: 1;
           }
         }
 
