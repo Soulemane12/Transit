@@ -668,7 +668,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
           parseFloat(station.Entrance_Longitude.toString()),
           parseFloat(station.Entrance_Latitude.toString())
         ])
-        .addTo(map.current);
+        .addTo(map.current!);
 
       // Add click handler for alert
       alertContainer.addEventListener('click', (e) => {
