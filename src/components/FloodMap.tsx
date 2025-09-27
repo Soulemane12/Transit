@@ -18,6 +18,7 @@ interface FloodMapProps {
   showFEMAFloodZones: boolean;
   showStormwaterFlood: boolean;
   forecastTime: number;
+  onUserLocationFound?: (location: { lng: number; lat: number }) => void;
 }
 
 export default function FloodMap({
@@ -26,26 +27,77 @@ export default function FloodMap({
   onStationClick,
   showFEMAFloodZones,
   showStormwaterFlood,
-  forecastTime
+  forecastTime,
+  onUserLocationFound
 }: FloodMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const exitMarkers = useRef<CustomMarker[]>([]);
+  const userLocationMarker = useRef<mapboxgl.Marker | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lng: number; lat: number } | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
+    // Initialize map with user's location if available, otherwise use default
+    const initialCenter = userLocation || DEFAULT_MAP_CENTER;
+    const initialZoom = userLocation ? 13 : DEFAULT_ZOOM;
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: MAP_STYLES.STREETS,
-      center: DEFAULT_MAP_CENTER,
-      zoom: DEFAULT_ZOOM
+      center: initialCenter,
+      zoom: initialZoom
+    });
+
+    // Add geolocate control
+    const geolocate = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+      trackUserLocation: true,
+      showUserHeading: true
+    });
+    
+    map.current.addControl(geolocate);
+    
+    // When geolocation is triggered, update the user's location
+    geolocate.on('geolocate', (e: GeolocationPosition) => {
+      const userLng = e.coords.longitude;
+      const userLat = e.coords.latitude;
+      const location = { lng: userLng, lat: userLat };
+      setUserLocation(location);
+      if (onUserLocationFound) {
+        onUserLocationFound(location);
+      }
+      
+      // Add or update user location marker
+      if (map.current) {
+        if (userLocationMarker.current) {
+          userLocationMarker.current.setLngLat([userLng, userLat]);
+        } else {
+          const el = document.createElement('div');
+          el.className = 'user-location-marker';
+          userLocationMarker.current = new mapboxgl.Marker(el)
+            .setLngLat([userLng, userLat])
+            .addTo(map.current);
+        }
+      }
     });
 
     map.current.on('load', () => {
       addStationsToMap();
+      
+      // Add navigation control
+      map.current?.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      
+      // Add scale control
+      map.current?.addControl(new mapboxgl.ScaleControl());
+      
+      // Add fullscreen control
+      map.current?.addControl(new mapboxgl.FullscreenControl());
     });
 
     // Cleanup function
@@ -143,6 +195,14 @@ export default function FloodMap({
 
   const addStationsToMap = useCallback(() => {
     if (!map.current) return;
+    
+    // Remove existing stations layer if it exists
+    if (map.current.getLayer('stations-layer')) {
+      map.current.removeLayer('stations-layer');
+    }
+    if (map.current.getSource('stations')) {
+      map.current.removeSource('stations');
+    }
 
     // Remove existing layers and sources
     if (map.current.getLayer('stations-layer')) {
@@ -238,21 +298,87 @@ export default function FloodMap({
         'circle-opacity': 0.8
       }
     });
+    
+    // Add layer for station labels
+    map.current.addLayer({
+      id: 'station-labels',
+      type: 'symbol',
+      source: 'stations',
+      layout: {
+        'text-field': ['get', 'stationName'],
+        'text-size': 12,
+        'text-offset': [0, 1.5],
+        'text-anchor': 'top',
+        'text-allow-overlap': false,
+        'text-ignore-placement': false,
+        'text-optional': true
+      },
+      paint: {
+        'text-color': '#1f2937',
+        'text-halo-color': 'rgba(255, 255, 255, 0.8)',
+        'text-halo-width': 2
+      },
+      minzoom: 12
+    });
 
-    // Add click event for stations and exits
+    // Add click interaction for stations
     map.current.on('click', 'stations-layer', (e) => {
-      if (!e.features || e.features.length === 0) return;
+      if (!e.features || e.features.length === 0 || !map.current) return;
+      
       const feature = e.features[0];
-      const stationKey = feature.properties?.stationKey;
-      if (stationKey) {
+      const geometry = feature.geometry as GeoJSON.Point;
+      const properties = feature.properties as {stationKey?: string; stationName?: string};
+      const stationKey = properties?.stationKey;
+      
+      if (stationKey && geometry.coordinates) {
         const assessment = assessments.find(a => a.stationId === stationKey);
         if (assessment) {
-          // Find the specific entrance if it's an exit
-          const entrance = entrances.find(e => 
-            `${e.Station_Name}-${e.Line}` === stationKey &&
-            e.Entrance_Type === 'Exit Only'
+          // Show all entrances for this station
+          const stationEntrances = entrances.filter(e => 
+            `${e.Station_Name}-${e.Line}` === stationKey
           );
-          onStationClick(assessment, entrance);
+          
+          // If there's only one entrance, select it directly
+          if (stationEntrances.length === 1) {
+            onStationClick(assessment, stationEntrances[0]);
+          } else if (stationEntrances.length > 1) {
+            // Show a popup with all entrances
+            const popup = new mapboxgl.Popup()
+              .setLngLat([
+                geometry.coordinates[0],
+                geometry.coordinates[1]
+              ])
+              .setHTML(`
+                <div class="station-popup">
+                  <h3>${feature.properties?.stationName}</h3>
+                  <p>${stationEntrances.length} entrances</p>
+                  <div class="entrance-list">
+                    ${stationEntrances.map(entrance => `
+                      <div class="entrance-item" data-entrance-id="${entrance.ENTRY_ID}">
+                        ${entrance.Entrance_Type === 'Exit Only' ? '🚪 ' : '⬆️ '}
+                        ${entrance.Entrance_Location || 'Main Entrance'}
+                        ${entrance.Entrance_Type === 'Exit Only' ? ' (Exit Only)' : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `)
+              .addTo(map.current!);
+              
+            // Add click handler for entrance items
+            setTimeout(() => {
+              document.querySelectorAll('.entrance-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                  const entranceId = (e.currentTarget as HTMLElement)?.dataset.entranceId;
+                  const selectedEntrance = stationEntrances.find(e => e.ENTRY_ID === entranceId);
+                  if (selectedEntrance) {
+                    onStationClick(assessment, selectedEntrance);
+                    popup.remove();
+                  }
+                });
+              });
+            }, 100);
+          }
         }
       }
     });

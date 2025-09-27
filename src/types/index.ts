@@ -1,9 +1,17 @@
 export interface SubwayEntrance {
+  // Core identification
+  ENTRY_ID: string;
   Division: string;
   Line: string;
   Station_Name: string;
+  
+  // Location data
   Station_Latitude: number;
   Station_Longitude: number;
+  Entrance_Latitude: number;
+  Entrance_Longitude: number;
+  
+  // Route information
   Route1: string;
   Route2: string;
   Route3: string;
@@ -15,22 +23,33 @@ export interface SubwayEntrance {
   Route9: string;
   Route10: string;
   Route11: string;
-  Entrance_Type: string;
-  Entry: string;
-  Exit_Only: string;
-  Vending: string;
-  Staffing: string;
+  
+  // Entrance properties
+  Entrance_Type: 'Exit Only' | 'Entrance/Exit' | 'Emergency Exit' | 'Elevator' | 'Escalator' | 'Stair';
+  Entry: 'Yes' | 'No';
+  Exit_Only: 'Yes' | 'No';
+  Vending: 'Yes' | 'No';
+  Staffing: 'Full Time' | 'Part Time' | 'None';
   Staff_Hours: string;
-  ADA: string;
+  
+  // Accessibility
+  ADA: 'Yes' | 'No';
   ADA_Notes: string;
-  Free_Crossover: string;
+  
+  // Location details
+  Free_Crossover: 'Yes' | 'No';
   North_South_Street: string;
   East_West_Street: string;
   Corner: string;
-  Entrance_Latitude: number;
-  Entrance_Longitude: number;
+  
+  // Descriptive fields
   Station_Location: string;
   Entrance_Location: string;
+  
+  // Additional metadata
+  lastUpdated?: string;
+  photoUrl?: string;
+  notes?: string;
 }
 
 export interface FloodRiskAssessment {
