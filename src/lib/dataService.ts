@@ -72,15 +72,7 @@ export class DataService {
   // Fetch FEMA flood zones
   async fetchFEMAFloodZones(): Promise<FloodZone[]> {
     try {
-      const response = await axios.get(API_ENDPOINTS.FEMA_FLOOD_ZONES, {
-        params: {
-          where: "STATE_ABBR='NY' AND (COUNTY_NAM='NEW YORK' OR COUNTY_NAM='QUEENS' OR COUNTY_NAM='KINGS' OR COUNTY_NAM='BRONX' OR COUNTY_NAM='RICHMOND')",
-          outFields: '*',
-          outSR: 4326,
-          f: 'geojson',
-          resultRecordCount: 1000
-        }
-      });
+      const response = await axios.get(API_ENDPOINTS.FEMA_FLOOD_ZONES);
 
       const data = response.data;
       if (data.features && data.features.length > 0) {
@@ -98,7 +90,8 @@ export class DataService {
       return [];
     } catch (error) {
       console.error('Error fetching FEMA flood zones:', error);
-      return [];
+      // Return mock FEMA data for demo purposes
+      return this.getMockFEMAData();
     }
   }
 
@@ -123,37 +116,41 @@ export class DataService {
       return [];
     } catch (error) {
       console.error('Error fetching stormwater flood data:', error);
-      return [];
+      // Return mock stormwater data for demo purposes
+      return this.getMockStormwaterData();
     }
   }
 
   // Fetch weather forecast
   async fetchWeatherForecast(): Promise<WeatherForecast[]> {
     try {
-      // Using OpenWeatherMap API (requires API key)
-      const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
+      // Using WeatherAPI (free tier available)
+      const apiKey = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
       if (!apiKey) {
-        console.warn('OpenWeatherMap API key not found, using mock data');
+        console.warn('Weather API key not found, using mock data');
         return this.getMockWeatherForecast();
       }
 
       const response = await axios.get(API_ENDPOINTS.WEATHER_API, {
         params: {
-          lat: 40.7589,
-          lon: -73.9851,
-          appid: apiKey,
-          units: 'imperial'
+          key: apiKey,
+          q: 'New York',
+          days: 3,
+          aqi: 'no',
+          alerts: 'no'
         }
       });
 
-      const forecasts: WeatherForecast[] = response.data.list.map((item: { dt_txt: string; rain?: { '1h'?: number }; main: { temp: number; humidity: number }; wind: { speed: number }; weather: Array<{ main: string }> }) => ({
-        timestamp: item.dt_txt,
-        rainfallIntensity: item.rain?.['1h'] || 0,
-        temperature: item.main.temp,
-        humidity: item.main.humidity,
-        windSpeed: item.wind.speed,
-        conditions: item.weather[0].main
-      }));
+      const forecasts: WeatherForecast[] = response.data.forecast.forecastday.map((day: { hour: Array<{ time: string; precip_in?: number; temp_f: number; humidity: number; wind_mph: number; condition: { text: string } }> }) => 
+        day.hour.map((hour: { time: string; precip_in?: number; temp_f: number; humidity: number; wind_mph: number; condition: { text: string } }) => ({
+          timestamp: hour.time,
+          rainfallIntensity: hour.precip_in || 0,
+          temperature: hour.temp_f,
+          humidity: hour.humidity,
+          windSpeed: hour.wind_mph,
+          conditions: hour.condition.text
+        }))
+      ).flat();
 
       this.weatherForecast = forecasts;
       return forecasts;
@@ -348,5 +345,67 @@ export class DataService {
       windSpeed: Math.random() * 20,
       conditions: ['clear', 'cloudy', 'rain'][Math.floor(Math.random() * 3)]
     }));
+  }
+
+  private getMockFEMAData(): FloodZone[] {
+    return [
+      {
+        type: 'FEMA',
+        zone: 'AE',
+        riskLevel: 'high',
+        baseFloodElevation: 12,
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [-74.0059, 40.7128], [-74.0259, 40.7328], [-73.9859, 40.7528],
+            [-73.9659, 40.7328], [-74.0059, 40.7128]
+          ]]
+        }
+      },
+      {
+        type: 'FEMA',
+        zone: 'A',
+        riskLevel: 'medium',
+        baseFloodElevation: 8,
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [-73.9859, 40.7428], [-74.0159, 40.7628], [-73.9759, 40.7828],
+            [-73.9559, 40.7628], [-73.9859, 40.7428]
+          ]]
+        }
+      }
+    ];
+  }
+
+  private getMockStormwaterData(): FloodZone[] {
+    return [
+      {
+        type: 'Stormwater',
+        zone: 'Extreme Storm',
+        riskLevel: 'high',
+        depth: 3.5,
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [-73.9859, 40.7528], [-74.0159, 40.7728], [-73.9759, 40.7928],
+            [-73.9559, 40.7728], [-73.9859, 40.7528]
+          ]]
+        }
+      },
+      {
+        type: 'Stormwater',
+        zone: 'Moderate Storm',
+        riskLevel: 'medium',
+        depth: 1.8,
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [-73.9659, 40.7328], [-73.9959, 40.7528], [-73.9559, 40.7728],
+            [-73.9259, 40.7528], [-73.9659, 40.7328]
+          ]]
+        }
+      }
+    ];
   }
 }

@@ -1,9 +1,9 @@
 export const API_ENDPOINTS = {
   SUBWAY_ENTRANCES: 'https://data.ny.gov/api/views/i9wp-a4ja/rows.csv?accessType=DOWNLOAD',
-  FEMA_FLOOD_ZONES: 'https://services.arcgis.com/Ee6nO1MdNJSOwgXW/arcgis/rest/services/FEMA_NFHL_Zones/FeatureServer/0/query',
-  STORMWATER_FLOOD: 'https://data.cityofnewyork.us/resource/qcg9-hq2p.geojson',
+  FEMA_FLOOD_ZONES: 'https://services.arcgis.com/Ee6nO1MdNJSOwgXW/arcgis/rest/services/FEMA_NFHL_Zones/FeatureServer/0/query?where=STATE_ABBR%3D%27NY%27+AND+(COUNTY_NAM%3D%27NEW%20YORK%27+OR+COUNTY_NAM%3D%27QUEENS%27+OR+COUNTY_NAM%3D%27KINGS%27+OR+COUNTY_NAM%3D%27BRONX%27+OR+COUNTY_NAM%3D%27RICHMOND%27)&outFields=*&outSR=4326&f=geojson&resultRecordCount=50',
+  STORMWATER_FLOOD: 'https://data.cityofnewyork.us/resource/uyj8-7rv5.geojson',
   MTA_ALERTS: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts',
-  WEATHER_API: 'https://api.openweathermap.org/data/2.5/forecast',
+  WEATHER_API: 'https://api.weatherapi.com/v1/forecast.json',
   NOAA_RAINFALL: 'https://api.weather.gov/gridpoints/OKX/33,37/forecast',
 } as const;
 
