@@ -460,24 +460,51 @@ export default function Home() {
             paint: {
               'fill-color': [
                 'case',
-                ['==', ['get', 'FLD_ZONE'], 'AE'], '#dc2626', // Red for AE zones
-                ['==', ['get', 'FLD_ZONE'], 'A'], '#ea580c',  // Orange for A zones
-                ['==', ['get', 'FLD_ZONE'], 'X'], '#22c55e',  // Green for X zones
-                '#fbbf24' // Yellow for other zones
+                ['==', ['get', 'FLD_ZONE'], 'AE'], '#ef4444', // Bright red for high risk AE zones
+                ['==', ['get', 'FLD_ZONE'], 'A'], '#f97316',  // Vibrant orange for A zones
+                ['==', ['get', 'FLD_ZONE'], 'X'], '#10b981',  // Modern green for low risk X zones
+                '#eab308' // Bright yellow for other zones
               ],
-              'fill-opacity': 0.4
+              'fill-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 0.3,  // Less opacity at lower zoom
+                15, 0.5   // More opacity when zoomed in
+              ],
+              'fill-outline-color': [
+                'case',
+                ['==', ['get', 'FLD_ZONE'], 'AE'], '#dc2626',
+                ['==', ['get', 'FLD_ZONE'], 'A'], '#ea580c',
+                ['==', ['get', 'FLD_ZONE'], 'X'], '#059669',
+                '#ca8a04'
+              ]
             }
           });
 
-          // Add flood zone borders
+          // Add flood zone borders with gradient effect
           map.current.addLayer({
             id: 'fema-flood-zones-border',
             type: 'line',
             source: 'fema-flood-zones',
             paint: {
-              'line-color': '#991b1b',
-              'line-width': 1,
-              'line-opacity': 0.8
+              'line-color': [
+                'case',
+                ['==', ['get', 'FLD_ZONE'], 'AE'], '#dc2626',
+                ['==', ['get', 'FLD_ZONE'], 'A'], '#ea580c',
+                ['==', ['get', 'FLD_ZONE'], 'X'], '#059669',
+                '#ca8a04'
+              ],
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 2,
+                15, 3,
+                18, 4
+              ],
+              'line-opacity': 0.9,
+              'line-blur': 0.5
             }
           });
 
@@ -487,14 +514,39 @@ export default function Home() {
             const properties = e.features?.[0]?.properties;
 
             if (properties) {
-              new mapboxgl.Popup()
+              const riskColor = properties.FLD_ZONE === 'AE' ? 'red' :
+                               properties.FLD_ZONE === 'A' ? 'orange' :
+                               properties.FLD_ZONE === 'X' ? 'green' : 'yellow';
+
+              new mapboxgl.Popup({
+                closeButton: true,
+                closeOnClick: false,
+                maxWidth: '300px'
+              })
                 .setLngLat(coordinates)
                 .setHTML(`
-                  <div class="p-3">
-                    <h3 class="font-bold text-lg">FEMA Flood Zone</h3>
-                    <p><strong>Zone:</strong> ${properties.FLD_ZONE || 'N/A'}</p>
-                    <p><strong>Floodway:</strong> ${properties.FLOODWAY || 'No'}</p>
-                    <p><strong>Base Flood Elevation:</strong> ${properties.STATIC_BFE || 'N/A'}</p>
+                  <div class="p-4 bg-white rounded-lg shadow-lg">
+                    <div class="flex items-center mb-3">
+                      <div class="w-3 h-3 bg-${riskColor}-500 rounded-full mr-2"></div>
+                      <h3 class="font-bold text-lg text-gray-800">FEMA Flood Zone</h3>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Zone:</span>
+                        <span class="font-semibold text-${riskColor}-600">${properties.FLD_ZONE || 'N/A'}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Floodway:</span>
+                        <span class="font-medium">${properties.FLOODWAY || 'No'}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Base Flood Elevation:</span>
+                        <span class="font-medium">${properties.STATIC_BFE ? properties.STATIC_BFE + ' ft' : 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                      📍 Official FEMA flood risk assessment
+                    </div>
                   </div>
                 `)
                 .addTo(map.current!);
@@ -542,24 +594,46 @@ export default function Home() {
             paint: {
               'fill-color': [
                 'case',
-                ['>', ['get', 'depth_ft'], 3], '#7c2d12', // Dark brown for deep flooding
-                ['>', ['get', 'depth_ft'], 1.5], '#dc2626', // Red for medium flooding
-                ['>', ['get', 'depth_ft'], 0.5], '#f97316', // Orange for shallow flooding
-                '#fbbf24' // Yellow for minimal flooding
+                ['>', ['get', 'depth_ft'], 3], '#1e40af', // Deep blue for deep flooding
+                ['>', ['get', 'depth_ft'], 1.5], '#3b82f6', // Medium blue for medium flooding
+                ['>', ['get', 'depth_ft'], 0.5], '#60a5fa', // Light blue for shallow flooding
+                '#93c5fd' // Very light blue for minimal flooding
               ],
-              'fill-opacity': 0.5
+              'fill-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 0.4,  // Less opacity at lower zoom
+                15, 0.6   // More opacity when zoomed in
+              ],
+              'fill-pattern': 'waves' // Add wave pattern if available
             }
           });
 
-          // Add stormwater flood zone borders
+          // Add animated stormwater flood zone borders
           map.current.addLayer({
             id: 'stormwater-flood-zones-border',
             type: 'line',
             source: 'stormwater-flood-zones',
             paint: {
-              'line-color': '#ea580c',
-              'line-width': 1,
-              'line-opacity': 0.8
+              'line-color': [
+                'case',
+                ['>', ['get', 'depth_ft'], 3], '#1e3a8a',
+                ['>', ['get', 'depth_ft'], 1.5], '#2563eb',
+                ['>', ['get', 'depth_ft'], 0.5], '#3b82f6',
+                '#60a5fa'
+              ],
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 2,
+                15, 3,
+                18, 4
+              ],
+              'line-opacity': 0.8,
+              'line-dasharray': [2, 2], // Dashed line for water effect
+              'line-blur': 0.3
             }
           });
 
@@ -569,14 +643,44 @@ export default function Home() {
             const properties = e.features?.[0]?.properties;
 
             if (properties) {
-              new mapboxgl.Popup()
+              const depth = properties.depth_ft || 0;
+              const depthColor = depth > 3 ? 'blue' :
+                               depth > 1.5 ? 'indigo' :
+                               depth > 0.5 ? 'cyan' : 'sky';
+
+              new mapboxgl.Popup({
+                closeButton: true,
+                closeOnClick: false,
+                maxWidth: '320px'
+              })
                 .setLngLat(coordinates)
                 .setHTML(`
-                  <div class="p-3">
-                    <h3 class="font-bold text-lg">Stormwater Flood Zone</h3>
-                    <p><strong>Depth:</strong> ${properties.depth_ft || 'N/A'} ft</p>
-                    <p><strong>Scenario:</strong> ${properties.scenario || 'Stormwater flooding'}</p>
-                    <p><strong>Source:</strong> NYC DEP</p>
+                  <div class="p-4 bg-white rounded-lg shadow-lg">
+                    <div class="flex items-center mb-3">
+                      <div class="w-3 h-3 bg-${depthColor}-500 rounded-full mr-2"></div>
+                      <h3 class="font-bold text-lg text-gray-800">Stormwater Flood Zone</h3>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Flood Depth:</span>
+                        <span class="font-semibold text-${depthColor}-600">${depth} ft</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Scenario:</span>
+                        <span class="font-medium">${properties.scenario || 'Stormwater flooding'}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Area:</span>
+                        <span class="font-medium">${properties.area || 'NYC'}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Source:</span>
+                        <span class="font-medium">NYC DEP</span>
+                      </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-blue-50 rounded text-xs text-gray-600">
+                      🌊 Stormwater flood modeling data
+                    </div>
                   </div>
                 `)
                 .addTo(map.current!);
@@ -638,70 +742,89 @@ export default function Home() {
       )}
 
       {/* Flood Risk Layer Control Panel */}
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg">
-        <h3 className="font-bold text-sm mb-3">Flood Risk Layers</h3>
-        <div className="space-y-2">
+      <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
+        <h3 className="font-bold text-base mb-4 text-gray-800 flex items-center">
+          <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+          Flood Risk Layers
+        </h3>
+        <div className="space-y-3">
           <button
             onClick={toggleFEMAFloodZones}
             disabled={floodDataLoading}
-            className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors ${
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
               showFEMAFloodZones
-                ? 'bg-red-100 text-red-800 border border-red-200'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } ${floodDataLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                ? 'bg-gradient-to-r from-red-50 to-red-100 text-red-800 border-2 border-red-200 shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:shadow-sm border border-gray-200'
+            } ${floodDataLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
           >
             <div className="flex items-center justify-between">
-              <span>FEMA Flood Zones</span>
-              <span className={`inline-block w-3 h-3 rounded-full ${
-                showFEMAFloodZones ? 'bg-red-500' : 'bg-gray-300'
-              }`}></span>
+              <div>
+                <span className="block font-semibold">FEMA Flood Zones</span>
+                <span className="text-xs opacity-75">Official flood risk areas</span>
+              </div>
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                showFEMAFloodZones ? 'bg-red-500 border-red-500' : 'border-gray-300'
+              }`}>
+                {showFEMAFloodZones && <span className="w-2 h-2 bg-white rounded-full"></span>}
+              </div>
             </div>
           </button>
 
           <button
             onClick={toggleStormwaterFlood}
             disabled={floodDataLoading}
-            className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors ${
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
               showStormwaterFlood
-                ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } ${floodDataLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                ? 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-800 border-2 border-blue-200 shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:shadow-sm border border-gray-200'
+            } ${floodDataLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
           >
             <div className="flex items-center justify-between">
-              <span>NYC Stormwater Flood</span>
-              <span className={`inline-block w-3 h-3 rounded-full ${
-                showStormwaterFlood ? 'bg-orange-500' : 'bg-gray-300'
-              }`}></span>
+              <div>
+                <span className="block font-semibold">NYC Stormwater Flood</span>
+                <span className="text-xs opacity-75">Storm surge scenarios</span>
+              </div>
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                showStormwaterFlood ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+              }`}>
+                {showStormwaterFlood && <span className="w-2 h-2 bg-white rounded-full"></span>}
+              </div>
             </div>
           </button>
         </div>
 
-        {/* Legend */}
-        <div className="mt-4 pt-3 border-t border-gray-200">
-          <p className="text-xs font-medium text-gray-600 mb-2">Legend:</p>
-          <div className="space-y-1 text-xs">
+        {/* Enhanced Legend */}
+        <div className="mt-5 pt-4 border-t border-gray-200">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Risk Levels:</p>
+          <div className="space-y-2">
             <div className="flex items-center">
-              <span className="inline-block w-3 h-3 bg-red-600 rounded-full mr-2"></span>
-              <span>High Risk (AE Zone)</span>
+              <div className="w-4 h-4 bg-gradient-to-r from-red-400 to-red-500 rounded-full mr-3 shadow-sm"></div>
+              <span className="text-xs font-medium">High Risk (AE Zone)</span>
             </div>
             <div className="flex items-center">
-              <span className="inline-block w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
-              <span>Medium Risk (A Zone)</span>
+              <div className="w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full mr-3 shadow-sm"></div>
+              <span className="text-xs font-medium">Medium Risk (A Zone)</span>
             </div>
             <div className="flex items-center">
-              <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-              <span>Low Risk (X Zone)</span>
+              <div className="w-4 h-4 bg-gradient-to-r from-green-400 to-green-500 rounded-full mr-3 shadow-sm"></div>
+              <span className="text-xs font-medium">Low Risk (X Zone)</span>
             </div>
             <div className="flex items-center">
-              <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
-              <span>Other/Stormwater</span>
+              <div className="w-4 h-4 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full mr-3 shadow-sm"></div>
+              <span className="text-xs font-medium">Stormwater Depth</span>
             </div>
+          </div>
+          <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600 leading-relaxed">
+              💡 Click on any colored area to see detailed flood information
+            </p>
           </div>
         </div>
 
         {floodDataLoading && (
-          <div className="mt-2 text-xs text-blue-600">
-            Loading flood data...
+          <div className="mt-4 flex items-center justify-center p-2 bg-blue-50 rounded-lg">
+            <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
+            <span className="text-xs text-blue-700 font-medium">Loading flood data...</span>
           </div>
         )}
       </div>
