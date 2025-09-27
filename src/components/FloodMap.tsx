@@ -50,7 +50,7 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   const alertMarkers = useRef<CustomMarker[]>([]);
   const currentPopup = useRef<mapboxgl.Popup | null>(null);
   const [selectedStation, setSelectedStation] = useState<FloodRiskAssessment | null>(null);
-  const [hoveredStation, setHoveredStation] = useState<string | null>(null);
+  const [, setHoveredStation] = useState<string | null>(null);
   const [, setActiveAlerts] = useState<FloodAlert[]>([]);
 
   // Create detailed popup content for stations
@@ -338,7 +338,8 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
         // Create and show detailed popup
         const popupContent = createStationPopupContent(stationAssessment, stationEntrances);
-        const coordinates = feature.geometry.type === 'Point' ? feature.geometry.coordinates as [number, number] : [0, 0];
+        const coordinates: [number, number] = feature.geometry.type === 'Point' ?
+          [feature.geometry.coordinates[0], feature.geometry.coordinates[1]] : [0, 0];
 
         currentPopup.current = new mapboxgl.Popup({
           closeButton: true,
