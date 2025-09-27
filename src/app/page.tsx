@@ -110,7 +110,17 @@ export default function Home() {
       const entrances = await fetchSubwayEntrances();
       
       if (entrances.length > 0 && map.current) {
-        // Convert to GeoJSON format
+        // Group entrances by station for better visualization
+        const stationGroups: Record<string, SubwayEntrance[]> = {};
+        entrances.forEach(entrance => {
+          const stationKey = `${entrance.Station_Name}-${entrance.Line}`;
+          if (!stationGroups[stationKey]) {
+            stationGroups[stationKey] = [];
+          }
+          stationGroups[stationKey].push(entrance);
+        });
+
+        // Convert to GeoJSON format with station grouping
         const geoJSONData = {
           type: 'FeatureCollection' as const,
           features: entrances.map((entrance, index) => ({
@@ -123,6 +133,7 @@ export default function Home() {
             properties: {
               stationName: entrance.Station_Name,
               line: entrance.Line,
+              stationKey: `${entrance.Station_Name}-${entrance.Line}`,
               routes: [
                 entrance.Route1, entrance.Route2, entrance.Route3, entrance.Route4, entrance.Route5,
                 entrance.Route6, entrance.Route7, entrance.Route8, entrance.Route9, entrance.Route10, entrance.Route11
@@ -135,7 +146,9 @@ export default function Home() {
               staffing: entrance.Staffing === 'Yes',
               northSouthStreet: entrance.North_South_Street,
               eastWestStreet: entrance.East_West_Street,
-              corner: entrance.Corner
+              corner: entrance.Corner,
+              totalEntrances: stationGroups[`${entrance.Station_Name}-${entrance.Line}`].length,
+              stationEntrances: stationGroups[`${entrance.Station_Name}-${entrance.Line}`]
             }
           }))
         };
@@ -146,18 +159,52 @@ export default function Home() {
           data: geoJSONData
         });
 
-        // Add subway entrances layer
+        // Add subway entrances layer with clustering
         map.current!.addLayer({
           id: 'subway-entrances-layer',
           type: 'circle',
           source: 'subway-entrances',
           paint: {
-            'circle-radius': 4,
-            'circle-color': '#1e40af',
-            'circle-stroke-width': 1,
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 3,
+              15, 5,
+              20, 8
+            ],
+            'circle-color': [
+              'case',
+              ['>', ['get', 'totalEntrances'], 5], '#dc2626', // Red for stations with many entrances
+              ['>', ['get', 'totalEntrances'], 2], '#ea580c', // Orange for medium entrances
+              '#1e40af' // Blue for single/few entrances
+            ],
+            'circle-stroke-width': 2,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.8
           }
+        });
+
+        // Add station labels
+        map.current!.addLayer({
+          id: 'station-labels',
+          type: 'symbol',
+          source: 'subway-entrances',
+          layout: {
+            'text-field': ['concat', ['get', 'stationName'], '\n', ['get', 'totalEntrances'], ' entrances'],
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-size': 12,
+            'text-anchor': 'top',
+            'text-offset': [0, 1.5],
+            'text-allow-overlap': false,
+            'text-ignore-placement': false
+          },
+          paint: {
+            'text-color': '#1f2937',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2
+          },
+          filter: ['==', ['get', 'totalEntrances'], ['get', 'totalEntrances']] // Show labels for all features
         });
 
         // Add click interaction for subway entrances
@@ -166,17 +213,39 @@ export default function Home() {
           const properties = e.features?.[0]?.properties;
 
           if (properties) {
-            new mapboxgl.Popup()
+            // Get all entrances for this station
+            const stationEntrances = properties.stationEntrances || [properties];
+            
+            const entrancesList = stationEntrances.map((entrance: SubwayEntrance, index: number) => `
+              <div class="border-b border-gray-200 py-2 ${index === stationEntrances.length - 1 ? 'border-b-0' : ''}">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium">${entrance.Entrance_Type || 'Entrance'}</p>
+                    <p class="text-xs text-gray-500">${entrance.North_South_Street} & ${entrance.East_West_Street}</p>
+                  </div>
+                  <div class="text-right">
+                    ${entrance.ADA === 'Yes' ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">ADA</span>' : ''}
+                    ${entrance.Exit_Only === 'Yes' ? '<span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded ml-1">Exit Only</span>' : ''}
+                    ${entrance.Vending === 'Yes' ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-1">Vending</span>' : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('');
+
+            new mapboxgl.Popup({ maxWidth: '400px' })
               .setLngLat(coordinates)
               .setHTML(`
-                <div class="p-2">
-                  <h3 class="font-bold text-lg">${properties.stationName}</h3>
-                  <p class="text-sm text-gray-600">${properties.line}</p>
-                  <p class="text-sm"><strong>Routes:</strong> ${properties.routes.join(', ')}</p>
-                  <p class="text-sm"><strong>Type:</strong> ${properties.entranceType}</p>
-                  ${properties.ada ? '<p class="text-sm text-green-600"><strong>ADA Accessible</strong></p>' : ''}
-                  ${properties.exitOnly ? '<p class="text-sm text-orange-600"><strong>Exit Only</strong></p>' : ''}
-                  <p class="text-xs text-gray-500">${properties.northSouthStreet} & ${properties.eastWestStreet}</p>
+                <div class="p-3">
+                  <div class="mb-3">
+                    <h3 class="font-bold text-lg">${properties.stationName}</h3>
+                    <p class="text-sm text-gray-600">${properties.line}</p>
+                    <p class="text-sm"><strong>Routes:</strong> ${properties.routes.join(', ')}</p>
+                    <p class="text-sm text-blue-600 font-medium">${properties.totalEntrances} entrances total</p>
+                  </div>
+                  <div class="max-h-60 overflow-y-auto">
+                    <h4 class="font-semibold text-sm mb-2 text-gray-700">All Entrances:</h4>
+                    ${entrancesList}
+                  </div>
                 </div>
               `)
               .addTo(map.current!);
@@ -212,10 +281,25 @@ export default function Home() {
       
       {/* Info panel */}
       {!loading && subwayEntrances.length > 0 && (
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
-          <h2 className="font-bold text-lg">NYC Subway Entrances</h2>
-          <p className="text-sm text-gray-600">{subwayEntrances.length.toLocaleString()} entrances loaded</p>
-          <p className="text-xs text-gray-500">Click on markers for details</p>
+        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg max-w-sm">
+          <h2 className="font-bold text-lg">NYC Subway Stations</h2>
+          <div className="mt-2 space-y-1">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">{new Set(subwayEntrances.map(e => `${e.Station_Name}-${e.Line}`)).size}</span> stations
+            </p>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">{subwayEntrances.length.toLocaleString()}</span> total entrances
+            </p>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">{subwayEntrances.filter(e => e.ADA === 'Yes').length}</span> ADA accessible
+            </p>
+          </div>
+          <div className="mt-3 text-xs text-gray-500">
+            <p><span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>5+ entrances</p>
+            <p><span className="inline-block w-3 h-3 bg-orange-500 rounded-full mr-2"></span>2-4 entrances</p>
+            <p><span className="inline-block w-3 h-3 bg-blue-500 rounded-full mr-2"></span>1 entrance</p>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Click on markers for station details</p>
         </div>
       )}
     </div>
