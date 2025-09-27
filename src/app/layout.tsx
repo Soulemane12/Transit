@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NYC Transit Flood Monitor",
-  description: "Real-time flood risk assessment for NYC subway stations with predictive modeling and mitigation suggestions",
+  title: "Metro Flood",
+  description: "Real-time flood risk assessment for subway systems with predictive modeling and mitigation suggestions",
 };
 
 export default function RootLayout({

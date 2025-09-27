@@ -18,7 +18,7 @@ export default function StatusHeader({ stats, loading, onRefresh }: StatusHeader
           {/* Title and Status */}
           <div className="flex items-center space-x-3">
             <div>
-              <h1 className="text-lg font-bold text-gray-900">NYC Transit Flood Monitor</h1>
+              <h1 className="text-lg font-bold text-gray-900">Metro Flood</h1>
               <p className="text-xs text-gray-600">Real-time flood risk assessment</p>
             </div>
             
