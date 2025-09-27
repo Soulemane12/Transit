@@ -169,9 +169,9 @@ export default function Home() {
               'interpolate',
               ['linear'],
               ['zoom'],
-              10, 3,
-              15, 5,
-              20, 8
+              10, 6,
+              15, 10,
+              20, 16
             ],
             'circle-color': [
               'case',
@@ -193,9 +193,9 @@ export default function Home() {
           layout: {
             'text-field': ['concat', ['get', 'stationName'], '\n', ['get', 'totalEntrances'], ' entrances'],
             'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-            'text-size': 12,
+            'text-size': 14,
             'text-anchor': 'top',
-            'text-offset': [0, 1.5],
+            'text-offset': [0, 2],
             'text-allow-overlap': false,
             'text-ignore-placement': false
           },
