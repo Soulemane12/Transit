@@ -233,13 +233,23 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
   // Add stations to map
   const addStationsToMap = useCallback(() => {
     if (!map.current || entrances.length === 0 || assessments.length === 0) return;
-    
-    // Remove existing layers and sources
-    if (map.current.getLayer('stations-layer')) {
-      map.current.removeLayer('stations-layer');
+
+    // Check if map style is loaded before proceeding
+    if (!map.current.isStyleLoaded()) {
+      console.log('Map style not loaded yet, skipping station addition');
+      return;
     }
-    if (map.current.getSource('stations')) {
-      map.current.removeSource('stations');
+
+    try {
+      // Remove existing layers and sources safely
+      if (map.current.getLayer('stations-layer')) {
+        map.current.removeLayer('stations-layer');
+      }
+      if (map.current.getSource('stations')) {
+        map.current.removeSource('stations');
+      }
+    } catch (error) {
+      console.warn('Error removing existing layers:', error);
     }
 
     // Group entrances by station
@@ -285,37 +295,87 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
       }))
     };
 
-    // Add source and layer to map
-    map.current.addSource('stations', {
-      type: 'geojson',
-      data: geoJsonData
-    });
-
-    map.current.addLayer({
-      id: 'stations-layer',
-      type: 'circle',
-      source: 'stations',
-      paint: {
-        'circle-radius': [
-          'interpolate',
-          ['linear'],
-          ['get', 'floodProbability'],
-          0, 6,
-          100, 12
-        ],
-        'circle-color': [
-          'match',
-          ['get', 'riskLevel'],
-          'critical', '#dc2626',
-          'high', '#ea580c',
-          'medium', '#d97706',
-          '#16a34a' // default color for low
-        ],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-        'circle-opacity': 0.8
+    try {
+      // Double-check style is loaded before adding layers
+      if (!map.current.isStyleLoaded()) {
+        console.warn('Style not loaded, cannot add stations layer');
+        return;
       }
-    });
+
+      // Add source and layer to map
+      map.current.addSource('stations', {
+        type: 'geojson',
+        data: geoJsonData
+      });
+
+      map.current.addLayer({
+        id: 'stations-layer',
+        type: 'circle',
+        source: 'stations',
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['get', 'floodProbability'],
+            0, 6,
+            100, 12
+          ],
+          'circle-color': [
+            'match',
+            ['get', 'riskLevel'],
+            'critical', '#dc2626',
+            'high', '#ea580c',
+            'medium', '#d97706',
+            '#16a34a' // default color for low
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+          'circle-opacity': 0.8
+        }
+      });
+    } catch (error) {
+      console.error('Error adding stations layer:', error);
+      // Retry once after a longer delay
+      setTimeout(() => {
+        if (map.current && map.current.isStyleLoaded()) {
+          try {
+            map.current.addSource('stations', {
+              type: 'geojson',
+              data: geoJsonData
+            });
+            map.current.addLayer({
+              id: 'stations-layer',
+              type: 'circle',
+              source: 'stations',
+              paint: {
+                'circle-radius': [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'floodProbability'],
+                  0, 6,
+                  100, 12
+                ],
+                'circle-color': [
+                  'match',
+                  ['get', 'riskLevel'],
+                  'critical', '#dc2626',
+                  'high', '#ea580c',
+                  'medium', '#d97706',
+                  '#16a34a'
+                ],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff',
+                'circle-opacity': 0.8
+              }
+            });
+            console.log('Stations layer added successfully on retry');
+          } catch (retryError) {
+            console.error('Failed to add stations layer on retry:', retryError);
+          }
+        }
+      }, 2000);
+      return;
+    }
 
     // Add click handler for stations
     const onStationClickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
@@ -769,59 +829,111 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
 
   // Toggle FEMA flood zones layer
   const toggleFEMAFloodZones = useCallback((show: boolean) => {
-    if (!map.current) return;
-    
-    if (show) {
-      // Add FEMA flood zones layer
-      if (!map.current.getSource('fema-flood-zones')) {
-        map.current.addSource('fema-flood-zones', {
-          type: 'geojson',
-          data: 'path/to/fema-flood-zones.geojson' // Replace with actual path
-        });
-        
-        map.current.addLayer({
-          id: 'fema-flood-zones-layer',
-          type: 'fill',
-          source: 'fema-flood-zones',
-          paint: {
-            'fill-color': '#088',
-            'fill-opacity': 0.3
-          }
-        });
-      } else {
-        map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'visible');
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    try {
+      if (show) {
+        // Add FEMA flood zones layer
+        if (!map.current.getSource('fema-flood-zones')) {
+          // For demo, create a simple placeholder flood zone
+          const demoFloodZone = {
+            type: 'FeatureCollection' as const,
+            features: [{
+              type: 'Feature' as const,
+              geometry: {
+                type: 'Polygon' as const,
+                coordinates: [[
+                  [-73.9900, 40.7400],
+                  [-73.9600, 40.7400],
+                  [-73.9600, 40.7650],
+                  [-73.9900, 40.7650],
+                  [-73.9900, 40.7400]
+                ]]
+              },
+              properties: {
+                zone: 'AE',
+                description: 'Demo FEMA Flood Zone AE'
+              }
+            }]
+          };
+
+          map.current.addSource('fema-flood-zones', {
+            type: 'geojson',
+            data: demoFloodZone
+          });
+
+          map.current.addLayer({
+            id: 'fema-flood-zones-layer',
+            type: 'fill',
+            source: 'fema-flood-zones',
+            paint: {
+              'fill-color': '#dc2626',
+              'fill-opacity': 0.2
+            }
+          });
+        } else if (map.current.getLayer('fema-flood-zones-layer')) {
+          map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'visible');
+        }
+      } else if (map.current.getLayer('fema-flood-zones-layer')) {
+        map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'none');
       }
-    } else if (map.current.getLayer('fema-flood-zones-layer')) {
-      map.current.setLayoutProperty('fema-flood-zones-layer', 'visibility', 'none');
+    } catch (error) {
+      console.warn('Error toggling FEMA flood zones:', error);
     }
   }, []);
 
   // Toggle stormwater flood layer
   const toggleStormwaterFlood = useCallback((show: boolean) => {
-    if (!map.current) return;
-    
-    if (show) {
-      // Add stormwater flood layer
-      if (!map.current.getSource('stormwater-flood')) {
-        map.current.addSource('stormwater-flood', {
-          type: 'geojson',
-          data: 'path/to/stormwater-flood.geojson' // Replace with actual path
-        });
-        
-        map.current.addLayer({
-          id: 'stormwater-flood-layer',
-          type: 'fill',
-          source: 'stormwater-flood',
-          paint: {
-            'fill-color': '#00f',
-            'fill-opacity': 0.2
-          }
-        });
-      } else {
-        map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'visible');
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    try {
+      if (show) {
+        // Add stormwater flood layer
+        if (!map.current.getSource('stormwater-flood')) {
+          // For demo, create a simple placeholder stormwater flood area
+          const demoStormwaterFlood = {
+            type: 'FeatureCollection' as const,
+            features: [{
+              type: 'Feature' as const,
+              geometry: {
+                type: 'Polygon' as const,
+                coordinates: [[
+                  [-73.9850, 40.7450],
+                  [-73.9700, 40.7450],
+                  [-73.9700, 40.7550],
+                  [-73.9850, 40.7550],
+                  [-73.9850, 40.7450]
+                ]]
+              },
+              properties: {
+                type: 'stormwater',
+                description: 'Demo Stormwater Flood Risk Area'
+              }
+            }]
+          };
+
+          map.current.addSource('stormwater-flood', {
+            type: 'geojson',
+            data: demoStormwaterFlood
+          });
+
+          map.current.addLayer({
+            id: 'stormwater-flood-layer',
+            type: 'fill',
+            source: 'stormwater-flood',
+            paint: {
+              'fill-color': '#3b82f6',
+              'fill-opacity': 0.2
+            }
+          });
+        } else if (map.current.getLayer('stormwater-flood-layer')) {
+          map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'visible');
+        }
+      } else if (map.current.getLayer('stormwater-flood-layer')) {
+        map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'none');
       }
-    } else if (map.current.getLayer('stormwater-flood-layer')) {
-      map.current.setLayoutProperty('stormwater-flood-layer', 'visibility', 'none');
+    } catch (error) {
+      console.warn('Error toggling stormwater flood layer:', error);
     }
   }, []);
 
@@ -830,29 +942,120 @@ const FloodMap = forwardRef<MapRef, FloodMapProps>(({
     if (!map.current) return;
 
     const updateMapData = () => {
-      addStationsToMap();
-      if (selectedStation) {
-        addExitMarkers();
+      // Ensure both map and style are fully loaded
+      if (!map.current || !map.current.loaded() || !map.current.isStyleLoaded()) {
+        console.log('Map or style not ready, deferring update');
+        return;
       }
+
+      // Add delay to ensure style is fully ready
+      setTimeout(() => {
+        try {
+          if (map.current && map.current.isStyleLoaded()) {
+            console.log('Updating map data...');
+            addStationsToMap();
+            if (selectedStation) {
+              addExitMarkers();
+            }
+            addFloodAlertMarkers();
+            console.log('Map data updated successfully');
+          }
+        } catch (error) {
+          console.warn('Error updating map data:', error);
+          // Retry after longer delay with additional checks
+          setTimeout(() => {
+            try {
+              if (map.current && map.current.isStyleLoaded()) {
+                console.log('Retrying map data update...');
+                addStationsToMap();
+                if (selectedStation) {
+                  addExitMarkers();
+                }
+                addFloodAlertMarkers();
+                console.log('Map data updated successfully on retry');
+              } else {
+                console.warn('Map style still not loaded on retry');
+              }
+            } catch (retryError) {
+              console.error('Failed to update map data after retry:', retryError);
+            }
+          }, 3000);
+        }
+      }, 1000);
     };
-    
-    if (map.current.loaded()) {
+
+    if (map.current.loaded() && map.current.isStyleLoaded()) {
       updateMapData();
-      addFloodAlertMarkers();
     } else {
+      let loadCompleted = false;
+      let styleCompleted = false;
+      let updateCalled = false;
+
+      const checkAndUpdate = () => {
+        if (loadCompleted && styleCompleted && !updateCalled) {
+          updateCalled = true;
+          updateMapData();
+        }
+      };
+
       const onLoad = () => {
-        updateMapData();
-        addFloodAlertMarkers();
+        console.log('Map load event fired');
+        loadCompleted = true;
+        checkAndUpdate();
         map.current?.off('load', onLoad);
       };
+
+      const onStyleData = () => {
+        console.log('Map styledata event fired');
+        if (map.current?.isStyleLoaded()) {
+          styleCompleted = true;
+          checkAndUpdate();
+          map.current?.off('styledata', onStyleData);
+        }
+      };
+
+      // Listen for both load and styledata events
       map.current.on('load', onLoad);
+      map.current.on('styledata', onStyleData);
     }
   }, [entrances, assessments, forecastTime, addStationsToMap, addExitMarkers, selectedStation, addFloodAlertMarkers]);
 
   // Toggle flood layers when visibility changes
   useEffect(() => {
-    toggleFEMAFloodZones(showFEMAFloodZones);
-    toggleStormwaterFlood(showStormwaterFlood);
+    if (map.current && map.current.loaded() && map.current.isStyleLoaded()) {
+      setTimeout(() => {
+        try {
+          console.log('Toggling flood layers:', { showFEMAFloodZones, showStormwaterFlood });
+          toggleFEMAFloodZones(showFEMAFloodZones);
+          toggleStormwaterFlood(showStormwaterFlood);
+        } catch (error) {
+          console.warn('Error toggling flood layers:', error);
+          // Retry once
+          setTimeout(() => {
+            try {
+              if (map.current && map.current.isStyleLoaded()) {
+                toggleFEMAFloodZones(showFEMAFloodZones);
+                toggleStormwaterFlood(showStormwaterFlood);
+              }
+            } catch (retryError) {
+              console.error('Failed to toggle flood layers on retry:', retryError);
+            }
+          }, 2000);
+        }
+      }, 1500);
+    } else {
+      // Wait for map to be ready
+      setTimeout(() => {
+        if (map.current && map.current.loaded() && map.current.isStyleLoaded()) {
+          try {
+            toggleFEMAFloodZones(showFEMAFloodZones);
+            toggleStormwaterFlood(showStormwaterFlood);
+          } catch (error) {
+            console.warn('Error toggling flood layers after wait:', error);
+          }
+        }
+      }, 3000);
+    }
   }, [showFEMAFloodZones, showStormwaterFlood, toggleFEMAFloodZones, toggleStormwaterFlood]);
 
   // Expose map methods via ref
