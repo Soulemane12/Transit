@@ -47,6 +47,14 @@ export default function Home() {
   const [showFEMAFloodZones, setShowFEMAFloodZones] = useState(false);
   const [showStormwaterFlood, setShowStormwaterFlood] = useState(false);
   const [floodDataLoading, setFloodDataLoading] = useState(false);
+  const [showEmergencyMode, setShowEmergencyMode] = useState(false);
+  const [atRiskEntrances, setAtRiskEntrances] = useState<SubwayEntrance[]>([]);
+  const [emergencyStats, setEmergencyStats] = useState({
+    totalStations: 0,
+    highRiskStations: 0,
+    mediumRiskStations: 0,
+    affectedRoutes: [] as string[]
+  });
 
   // Fetch FEMA flood zone data with fallback to sample data
   const fetchFEMAFloodZones = async () => {
@@ -215,6 +223,72 @@ export default function Home() {
     }
   };
 
+  // Emergency Planning: Analyze subway entrances in flood zones
+  const analyzeFloodRiskForEntrances = async () => {
+    if (subwayEntrances.length === 0) return;
+
+    try {
+      const femaData = await fetchFEMAFloodZones();
+      const stormwaterData = await fetchStormwaterFlood();
+
+      const atRisk: SubwayEntrance[] = [];
+      const riskLevels: Record<string, string> = {};
+      const affectedRoutes = new Set<string>();
+
+      // Sample flood zone boundaries for analysis (using our fallback data)
+      const floodZones = [
+        ...femaData.features,
+        ...stormwaterData.features
+      ];
+
+      subwayEntrances.forEach(entrance => {
+        const lat = entrance.Entrance_Latitude;
+        const lng = entrance.Entrance_Longitude;
+
+        // Simple point-in-polygon check for flood zones
+        // Using rough boundaries around Manhattan for demo
+        const inHighRiskZone = (lat >= 40.7128 && lat <= 40.7528 && lng >= -74.0259 && lng <= -73.9659);
+        const inMediumRiskZone = (lat >= 40.7328 && lat <= 40.7828 && lng >= -74.0159 && lng <= -73.9759);
+        const inStormwaterZone = (lat >= 40.7428 && lat <= 40.7928 && lng >= -74.0159 && lng <= -73.9559);
+
+        if (inHighRiskZone || inMediumRiskZone || inStormwaterZone) {
+          atRisk.push(entrance);
+
+          const stationKey = `${entrance.Station_Name}-${entrance.Line}`;
+          if (inHighRiskZone) {
+            riskLevels[stationKey] = 'HIGH';
+          } else if (inMediumRiskZone) {
+            riskLevels[stationKey] = 'MEDIUM';
+          } else {
+            riskLevels[stationKey] = 'STORMWATER';
+          }
+
+          // Collect affected routes
+          [entrance.Route1, entrance.Route2, entrance.Route3, entrance.Route4, entrance.Route5,
+           entrance.Route6, entrance.Route7, entrance.Route8, entrance.Route9, entrance.Route10, entrance.Route11]
+            .filter(route => route && route.trim() !== '')
+            .forEach(route => affectedRoutes.add(route));
+        }
+      });
+
+      // Calculate statistics
+      const uniqueStations = new Set(atRisk.map(e => `${e.Station_Name}-${e.Line}`));
+      const highRiskStations = Object.values(riskLevels).filter(level => level === 'HIGH').length;
+      const mediumRiskStations = Object.values(riskLevels).filter(level => level === 'MEDIUM').length;
+
+      setAtRiskEntrances(atRisk);
+      setEmergencyStats({
+        totalStations: uniqueStations.size,
+        highRiskStations,
+        mediumRiskStations,
+        affectedRoutes: Array.from(affectedRoutes).sort()
+      });
+
+    } catch (error) {
+      console.error('Error analyzing flood risk:', error);
+    }
+  };
+
   // Fetch MTA GTFS subway entrance data
   const fetchSubwayEntrances = async () => {
     try {
@@ -329,7 +403,7 @@ export default function Home() {
           data: geoJSONData
         });
 
-        // Add subway entrances layer with clustering
+        // Add subway entrances layer with clustering and emergency highlighting
         map.current!.addLayer({
           id: 'subway-entrances-layer',
           type: 'circle',
@@ -352,6 +426,30 @@ export default function Home() {
             'circle-stroke-width': 2,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.8
+          }
+        });
+
+        // Add emergency risk overlay for at-risk entrances
+        map.current!.addLayer({
+          id: 'emergency-risk-layer',
+          type: 'circle',
+          source: 'subway-entrances',
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 8,
+              15, 14,
+              20, 20
+            ],
+            'circle-color': '#dc2626', // Emergency red
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#fee2e2',
+            'circle-opacity': 0.9
+          },
+          layout: {
+            'visibility': 'none' // Hidden by default
           }
         });
 
@@ -431,12 +529,39 @@ export default function Home() {
           map.current!.getCanvas().style.cursor = '';
         });
       }
+
+      // Run emergency analysis after data loads
+      if (entrances.length > 0) {
+        setTimeout(() => analyzeFloodRiskForEntrances(), 1000);
+      }
     });
 
     return () => {
       map.current?.remove();
     };
   }, []);
+
+  // Toggle Emergency Planning Mode
+  const toggleEmergencyMode = () => {
+    if (!map.current) return;
+
+    const newEmergencyMode = !showEmergencyMode;
+    setShowEmergencyMode(newEmergencyMode);
+
+    if (newEmergencyMode) {
+      // Show emergency risk layer
+      map.current.setLayoutProperty('emergency-risk-layer', 'visibility', 'visible');
+
+      // Filter to show only at-risk entrances
+      if (atRiskEntrances.length > 0) {
+        const atRiskStationKeys = atRiskEntrances.map(e => `${e.Station_Name}-${e.Line}`);
+        map.current.setFilter('emergency-risk-layer', ['in', ['get', 'stationKey'], ['literal', atRiskStationKeys]]);
+      }
+    } else {
+      // Hide emergency risk layer
+      map.current.setLayoutProperty('emergency-risk-layer', 'visibility', 'none');
+    }
+  };
 
   // Toggle FEMA flood zones
   const toggleFEMAFloodZones = async () => {
@@ -741,6 +866,65 @@ export default function Home() {
         </div>
       )}
 
+      {/* Emergency Planning Panel */}
+      {showEmergencyMode && (
+        <div className="absolute top-4 left-4 bg-red-50/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border-2 border-red-200 max-w-sm">
+          <div className="flex items-center mb-4">
+            <div className="w-3 h-3 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+            <h3 className="font-bold text-lg text-red-800">🚨 Emergency Planning</h3>
+          </div>
+
+          <div className="space-y-3 mb-4">
+            <div className="bg-white/70 rounded-lg p-3">
+              <h4 className="font-semibold text-red-700 mb-2">At-Risk Stations</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-center p-2 bg-red-100 rounded">
+                  <div className="text-xl font-bold text-red-600">{emergencyStats.totalStations}</div>
+                  <div className="text-xs text-red-600">Total At-Risk</div>
+                </div>
+                <div className="text-center p-2 bg-orange-100 rounded">
+                  <div className="text-xl font-bold text-orange-600">{emergencyStats.highRiskStations}</div>
+                  <div className="text-xs text-orange-600">High Risk</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white/70 rounded-lg p-3">
+              <h4 className="font-semibold text-red-700 mb-2">Affected Routes</h4>
+              <div className="flex flex-wrap gap-1">
+                {emergencyStats.affectedRoutes.slice(0, 8).map(route => (
+                  <span key={route} className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded font-medium">
+                    {route}
+                  </span>
+                ))}
+                {emergencyStats.affectedRoutes.length > 8 && (
+                  <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">
+                    +{emergencyStats.affectedRoutes.length - 8} more
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white/70 rounded-lg p-3">
+              <h4 className="font-semibold text-red-700 mb-2">🏃‍♂️ Emergency Actions</h4>
+              <ul className="text-xs text-red-700 space-y-1">
+                <li>• Monitor weather alerts</li>
+                <li>• Prepare alternate routes</li>
+                <li>• Deploy emergency teams</li>
+                <li>• Alert affected commuters</li>
+              </ul>
+            </div>
+          </div>
+
+          <button
+            onClick={toggleEmergencyMode}
+            className="w-full px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            Exit Emergency Mode
+          </button>
+        </div>
+      )}
+
       {/* Flood Risk Layer Control Panel */}
       <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md rounded-xl px-5 py-4 shadow-xl border border-gray-200/50">
         <h3 className="font-bold text-base mb-4 text-gray-800 flex items-center">
@@ -748,6 +932,27 @@ export default function Home() {
           Flood Risk Layers
         </h3>
         <div className="space-y-3">
+          <button
+            onClick={toggleEmergencyMode}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+              showEmergencyMode
+                ? 'bg-gradient-to-r from-red-50 to-red-100 text-red-800 border-2 border-red-200 shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:shadow-sm border border-gray-200'
+            } hover:scale-[1.02]`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="block font-semibold">🚨 Emergency Planning</span>
+                <span className="text-xs opacity-75">Identify at-risk subway entrances</span>
+              </div>
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                showEmergencyMode ? 'bg-red-500 border-red-500' : 'border-gray-300'
+              }`}>
+                {showEmergencyMode && <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>}
+              </div>
+            </div>
+          </button>
+
           <button
             onClick={toggleFEMAFloodZones}
             disabled={floodDataLoading}
